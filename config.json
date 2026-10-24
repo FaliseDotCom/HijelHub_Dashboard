@@ -1,5 +1,16 @@
 {
   "repos": [
-    "owner/repo-name"
+    "FaliseDotCom/jellyfin-plugin-nextup-keeper",
+    "FaliseDotCom/ha-kimai",
+    "FaliseDotCom/ha-homarr",
+    "FaliseDotCom/ha-dashy",
+    "FaliseDotCom/ha-glance",
+    "FaliseDotCom/foxhole-awesome-tracking-tool",
+    "FaliseDotCom/kimai-timesheet-extras-bundle",
+    "FaliseDotCom/kimai-reporting-graphs-bundle",
+    "FaliseDotCom/kimai-inline-timesheet-edit-bundle",
+    "FaliseDotCom/kimai-quick-timer-bar-bundle",
+    "FaliseDotCom/kimai-short-time-entries-bundle",
+    "FaliseDotCom/ha-solidtime",    
   ]
 }
