@@ -231,11 +231,12 @@ body {
 .card-sub strong { font-weight: 500; color: var(--tx); }
 
 .chart-wrap { margin-top: 12px; height: 160px; position: relative; }
-.chart-wrap canvas { width: 100% !important; height: 100% !important; }
+.chart-wrap canvas { width: 100% !important; height: 100% !important; cursor: grab; }
+.chart-wrap canvas:active { cursor: grabbing; }
 
 .chart-controls {
   display: flex; align-items: center; justify-content: space-between;
-  margin-top: 6px;
+  flex-wrap: wrap; gap: 6px; margin-top: 6px;
 }
 
 .chart-legend { display: flex; gap: 12px; font-size: 11px; color: var(--tx3); }
@@ -243,14 +244,19 @@ body {
 .legend-line { width: 14px; height: 0; border-top: 2px solid; }
 .legend-line.dashed { border-top-style: dashed; }
 
-.chart-reset {
-  font-size: 10px; font-family: var(--font-m);
+.chart-buttons { display: flex; gap: 3px; margin-left: auto; }
+
+.chart-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; padding: 0;
   background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 4px; padding: 2px 8px;
-  color: var(--tx3); cursor: pointer; transition: all 0.15s;
+  border-radius: 4px; color: var(--tx3);
+  cursor: pointer; transition: all 0.15s;
 }
 
-.chart-reset:hover { background: var(--bg3); color: var(--tx2); }
+.chart-btn:hover { background: var(--bg3); color: var(--tx2); }
+.chart-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chart-btn svg { width: 12px; height: 12px; }
 
 /* ── Tabs ───────────────────────────────────────────────────────────────── */
 
