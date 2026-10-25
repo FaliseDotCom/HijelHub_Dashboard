@@ -452,6 +452,7 @@ const App = (() => {
     const totals = dataPoints.map((d, i) => ({ x: i, y: d.count }));
     const uniques = dataPoints.map((d, i) => ({ x: i, y: d.uniques }));
     const maxIdx = Math.max(labels.length - 1, 0);
+    const maxCount = dataPoints.reduce((m, d) => Math.max(m, d.count, d.uniques), 0);
 
     // Compute initial viewport using days-based range
     const defaultRange = theme.defaultChartRange;
@@ -497,7 +498,8 @@ const App = (() => {
             pointHoverRadius: 6,
             pointBackgroundColor: getCSS("--chart1"),
             pointHoverBackgroundColor: getCSS("--chart1"),
-            tension: 0.3,
+            // Monotone curves never overshoot, so flat zero stretches stay flat
+            cubicInterpolationMode: "monotone",
             fill: false,
           },
           {
@@ -510,7 +512,7 @@ const App = (() => {
             pointHoverRadius: 6,
             pointBackgroundColor: getCSS("--chart2"),
             pointHoverBackgroundColor: getCSS("--chart2"),
-            tension: 0.3,
+            cubicInterpolationMode: "monotone",
             fill: false,
           },
         ],
@@ -519,6 +521,8 @@ const App = (() => {
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
+        // Transitions lag behind panning and zooming, so redraw instantly
+        animation: false,
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -565,6 +569,8 @@ const App = (() => {
             grid: { color: getCSS("--border"), lineWidth: 0.5 },
             border: { display: false },
             beginAtZero: true,
+            // Fit all data, not just the visible days, so zoom stays horizontal
+            suggestedMax: maxCount,
           },
         },
       },
@@ -622,7 +628,7 @@ const App = (() => {
     const { chart } = entry;
     const width = chart.chartArea.right - chart.chartArea.left;
     // A positive pixel delta drags the content right, revealing earlier dates
-    chart.pan({ x: -direction * width * PAN_STEP }, undefined, "default");
+    chart.pan({ x: -direction * width * PAN_STEP }, undefined, "none");
   }
 
   /**
@@ -635,7 +641,7 @@ const App = (() => {
     const entry = findChart(canvasId);
     if (!entry || !entry.chart.zoom) return;
     const factor = direction > 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-    entry.chart.zoom({ x: factor }, "default");
+    entry.chart.zoom({ x: factor }, "none");
   }
 
   function resetZoom(canvasId) {
@@ -643,10 +649,10 @@ const App = (() => {
     if (!entry) return;
     const { chart, defaultMinIdx } = entry;
     if (chart.resetZoom) {
-      chart.resetZoom();
+      chart.resetZoom("none");
     }
     chart.options.scales.x.min = defaultMinIdx;
-    chart.update();
+    chart.update("none");
   }
 
   // ── Tabs ─────────────────────────────────────────────────────────────────
