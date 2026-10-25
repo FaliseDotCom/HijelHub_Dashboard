@@ -400,8 +400,8 @@ const App = (() => {
   const CHART_BUTTONS = [
     { label: "Pan left", action: "App.panChart('{id}', -1)", icon: '<path d="m15 18-6-6 6-6"/>' },
     { label: "Pan right", action: "App.panChart('{id}', 1)", icon: '<path d="m9 18 6-6-6-6"/>' },
-    { label: "Zoom out", action: "App.zoomChart('{id}', -1)", icon: '<path d="M5 12h14"/>' },
     { label: "Zoom in", action: "App.zoomChart('{id}', 1)", icon: '<path d="M5 12h14M12 5v14"/>' },
+    { label: "Zoom out", action: "App.zoomChart('{id}', -1)", icon: '<path d="M5 12h14"/>' },
     { label: "Reset zoom", action: "App.resetZoom('{id}')", icon: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>' },
   ];
 
