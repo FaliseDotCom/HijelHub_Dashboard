@@ -368,6 +368,7 @@ const App = (() => {
       const views = data && data.data ? data.data.views || [] : [];
       const clones = data && data.data ? data.data.clones || [] : [];
       const referrers = data && data.data ? data.data.referrers || [] : [];
+      const releases = data && data.data ? data.data.releases || [] : [];
 
       // All-time totals for headline numbers
       const totalViews = sumBy(views, "count");
@@ -403,6 +404,10 @@ const App = (() => {
             <span class="badge-sep">/</span>
             <span class="${pullRequests.open > 0 ? "badge-accent" : ""}" title="Open PRs">${fmt(pullRequests.open)}</span>`)}
           ${data && typeof data.comments === "number" ? renderBadge(`${repoUrl}/issues?q=sort%3Acomments-desc`, "Comments on issues and pull requests", "comments", fmt(data.comments)) : ""}
+          ${dataError ? "" : renderBadge(`${repoUrl}/releases`, "Releases", "releases", `
+            <span title="Releases">${fmt(releases.length)}</span>
+            <span class="badge-sep">/</span>
+            <span title="Release downloads">${fmt(sumBy(releases, "downloads"))}</span>`, "releases downloads")}
           ${data && data.pushedAt ? renderBadge(`${repoUrl}/commits`, `Last push ${longDate(new Date(data.pushedAt))}`, "pushed", timeAgo(data.pushedAt)) : ""}
           <button class="csv-btn" data-repo-idx="${idx}" onclick="App.exportCSV(${idx})"${dataError ? " disabled" : ""}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 12V14H12V12M8 2V10M5 7L8 10L11 7"/></svg>
@@ -412,7 +417,7 @@ const App = (() => {
         <div class="row g-3">
           <!-- Visitors -->
           <div class="col-md-4 col-12">
-            <div class="card-dash">
+            <div class="card-dash" data-sort-target="visitors">
               <div class="card-label">Visitors</div>
               ${dataError
                 ? '<div class="no-data-msg">Data not yet collected</div>'
@@ -424,7 +429,7 @@ const App = (() => {
           </div>
           <!-- Clones -->
           <div class="col-md-4 col-12">
-            <div class="card-dash">
+            <div class="card-dash" data-sort-target="clones">
               <div class="card-label">Clones</div>
               ${dataError
                 ? '<div class="no-data-msg">Data not yet collected</div>'
@@ -436,7 +441,7 @@ const App = (() => {
           </div>
           <!-- Referrers / Releases -->
           <div class="col-md-4 col-12">
-            <div class="card-dash" id="card3-${idx}">
+            <div class="card-dash" id="card3-${idx}" data-sort-target="referrers">
               <div class="tabs">
                 <div class="tab active" onclick="App.switchTab('card3-${idx}','ref')">Referrers</div>
                 <div class="tab" onclick="App.switchTab('card3-${idx}','rel')">Releases</div>
@@ -530,10 +535,12 @@ const App = (() => {
    * @param {string} title Tooltip describing the value.
    * @param {string} iconName Key in ICONS.
    * @param {string} content Badge content markup, already escaped.
+   * @param {string} [sortTarget] Space-separated sort option keys whose
+   *   values this badge shows, highlighted while sorting on them.
    * @returns {string} Badge markup.
    */
-  function renderBadge(href, title, iconName, content) {
-    return `<a class="repo-badge" href="${href}" target="_blank" rel="noopener noreferrer" title="${esc(title)}">
+  function renderBadge(href, title, iconName, content, sortTarget = iconName) {
+    return `<a class="repo-badge" href="${href}" target="_blank" rel="noopener noreferrer" title="${esc(title)}" data-sort-target="${sortTarget}">
             ${icon(iconName)}
             ${content}
           </a>`;
@@ -595,15 +602,16 @@ const App = (() => {
    * Options in the sort bar, in display order. `value` returns what a repo is
    * compared on, most significant first, or an empty array when that repo has
    * no such data; those repos always go last. `dir` is the direction picked
-   * when the option is first chosen: 1 ascending, -1 descending.
-   * @type {Array<{ key: string, label: string, title: string, dir: number, value: function(Object): Array }>}
+   * when the option is first chosen: 1 ascending, -1 descending. `tab` is
+   * the referrers/releases card tab that lists the sorted data.
+   * @type {Array<{ key: string, label: string, title: string, dir: number, tab?: string, value: function(Object): Array }>}
    */
   const SORT_OPTIONS = [
     { key: "order", label: "Default", title: "Order of config.json", dir: 1, value: (e) => [e.idx] },
     { key: "name", label: "Name", title: "Repository name", dir: 1, value: (e) => [e.repo.toLowerCase(), e.owner.toLowerCase()] },
     { key: "visitors", label: "Visitors", title: "All-time visitors, then unique visitors", dir: -1, value: (e) => trafficTotals(trafficList(e.data, "views")) },
     { key: "clones", label: "Clones", title: "All-time clones, then unique clones", dir: -1, value: (e) => trafficTotals(trafficList(e.data, "clones")) },
-    { key: "referrers", label: "Referrers", title: "Visits from referring sites, then number of sites", dir: -1, value: (e) => {
+    { key: "referrers", label: "Referrers", title: "Visits from referring sites, then number of sites", dir: -1, tab: "ref", value: (e) => {
       const referrers = trafficList(e.data, "referrers");
       return referrers ? [sumBy(referrers, "count"), referrers.length] : [];
     } },
@@ -612,11 +620,11 @@ const App = (() => {
     { key: "issues", label: "Issues", title: "All issues, then open issues", dir: -1, value: (e) => pairTotals(e.data && e.data.issues, "closed") },
     { key: "pulls", label: "PRs", title: "Merged and open pull requests, then open ones", dir: -1, value: (e) => pairTotals(e.data && e.data.pullRequests, "merged") },
     { key: "comments", label: "Comments", title: "Comments on issues and pull requests", dir: -1, value: (e) => numberValue(e.data && e.data.comments) },
-    { key: "releases", label: "Releases", title: "Number of releases, then release downloads", dir: -1, value: (e) => {
+    { key: "releases", label: "Releases", title: "Number of releases, then release downloads", dir: -1, tab: "rel", value: (e) => {
       const releases = trafficList(e.data, "releases");
       return releases ? [releases.length, sumBy(releases, "downloads")] : [];
     } },
-    { key: "downloads", label: "Downloads", title: "Release downloads over all releases", dir: -1, value: (e) => {
+    { key: "downloads", label: "Downloads", title: "Release downloads over all releases", dir: -1, tab: "rel", value: (e) => {
       const releases = trafficList(e.data, "releases");
       return releases ? [sumBy(releases, "downloads")] : [];
     } },
@@ -703,11 +711,29 @@ const App = (() => {
   }
 
   /**
+   * Shows where the sorted values are: highlights the badges and cards that
+   * hold them and, for referrers and releases, opens the tab that lists them.
+   * @returns {void}
+   */
+  function showSortTarget() {
+    const key = sortState.key;
+    document.querySelectorAll("[data-sort-target]").forEach((el) => {
+      el.classList.toggle("sorted", el.dataset.sortTarget.split(" ").includes(key));
+    });
+    const option = findSortOption(key);
+    if (!option || !option.tab) return;
+    for (const entry of repoEntries) {
+      switchTab(`card3-${entry.idx}`, option.tab);
+    }
+  }
+
+  /**
    * Reorders the repo sections on screen for the active sort. Sections are
    * moved rather than re-rendered, so charts keep their zoom and pan.
    * @returns {void}
    */
   function applySort() {
+    showSortTarget();
     const list = document.getElementById("repo-list");
     const option = findSortOption(sortState.key);
     if (!list || !option) return;
