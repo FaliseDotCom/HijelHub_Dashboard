@@ -50,6 +50,25 @@ async function apiCount(endpoint) {
 }
 
 /**
+ * Fetches every page of a paginated list endpoint, 100 items per page,
+ * following the "next" link until the last page.
+ * @param {string} endpoint API path of a list endpoint, without paging parameters.
+ * @returns {Promise<Array>} All items of the list.
+ */
+async function apiGetAll(endpoint) {
+  const items = [];
+  let next = `${endpoint}?per_page=100`;
+  while (next) {
+    const { headers, body } = await apiRequest(next);
+    if (!Array.isArray(body)) break;
+    items.push(...body);
+    const link = /<https:\/\/api\.github\.com([^>]+)>; rel="next"/.exec(headers.link || "");
+    next = link ? link[1] : null;
+  }
+  return items;
+}
+
+/**
  * Sends an authenticated GET request to the GitHub REST API.
  * @param {string} endpoint API path, including any query string.
  * @returns {Promise<{ headers: Object, body: * }>} Response headers and parsed JSON body.
@@ -195,7 +214,7 @@ async function processRepo(repoFullName) {
       apiGet(`/repos/${owner}/${repo}/traffic/views`),
       apiGet(`/repos/${owner}/${repo}/traffic/clones`),
       apiGet(`/repos/${owner}/${repo}/traffic/popular/referrers`),
-      apiGet(`/repos/${owner}/${repo}/releases`),
+      apiGetAll(`/repos/${owner}/${repo}/releases`),
     ]);
   } catch (err) {
     console.error(`  ✗  API error for ${repoFullName}: ${err.message}`);
