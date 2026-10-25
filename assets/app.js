@@ -423,7 +423,10 @@ const App = (() => {
                   <div class="chart-legend-item"><div class="legend-line" style="border-color:var(--chart1)"></div>Total</div>
                   <div class="chart-legend-item"><div class="legend-line dashed" style="border-color:var(--chart2)"></div>Unique</div>
                 </div>
-                <div class="chart-buttons">${buttons}</div>
+                <div class="chart-buttons">
+                  <svg class="chart-buttons-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                  ${buttons}
+                </div>
               </div>`;
   }
 
@@ -445,8 +448,10 @@ const App = (() => {
     if (!canvas) return;
 
     const labels = dataPoints.map((d) => dateLabel(d.date));
-    const totals = dataPoints.map((d) => d.count);
-    const uniques = dataPoints.map((d) => d.uniques);
+    // Plot against the day index on a linear scale so panning is stepless
+    const totals = dataPoints.map((d, i) => ({ x: i, y: d.count }));
+    const uniques = dataPoints.map((d, i) => ({ x: i, y: d.uniques }));
+    const maxIdx = Math.max(labels.length - 1, 0);
 
     // Compute initial viewport using days-based range
     const defaultRange = theme.defaultChartRange;
@@ -469,9 +474,9 @@ const App = (() => {
         enabled: true,
         mode: "x",
       };
-      // Category scale works in label indexes; keep the view inside the data
+      // Keep the view inside the data and show at least three days
       zoomOptions.limits = {
-        x: { min: 0, max: Math.max(labels.length - 1, 0) },
+        x: { min: 0, max: maxIdx, minRange: 2 },
       };
     }
 
@@ -482,7 +487,6 @@ const App = (() => {
     const chart = new Chart(canvas.getContext("2d"), {
       type: "line",
       data: {
-        labels,
         datasets: [
           {
             label: "Total",
@@ -528,7 +532,7 @@ const App = (() => {
             boxHeight: 2,
             boxPadding: 4,
             callbacks: {
-              title: (items) => items[0].label,
+              title: (items) => labels[items[0].parsed.x],
               label: (item) => ` ${item.dataset.label}: ${item.formattedValue}`,
             },
           },
@@ -536,15 +540,21 @@ const App = (() => {
         },
         scales: {
           x: {
+            type: "linear",
+            bounds: "data",
             ticks: {
               color: getCSS("--tx3"),
               font: { family: tooltipMonoFont, size: 9 },
               maxRotation: 0,
               maxTicksLimit: 6,
+              precision: 0,
+              includeBounds: false,
+              callback: (value) => labels[value] || "",
             },
             grid: { color: getCSS("--border"), lineWidth: 0.5 },
             border: { display: false },
-            min: minIdx > 0 ? labels[minIdx] : undefined,
+            min: minIdx,
+            max: maxIdx,
           },
           y: {
             ticks: {
@@ -560,7 +570,7 @@ const App = (() => {
       },
     });
 
-    chartInstances.push({ id: canvasId, chart, defaultMinIdx: minIdx, labels });
+    chartInstances.push({ id: canvasId, chart, defaultMinIdx: minIdx });
   }
 
   function updateAllChartColors() {
@@ -631,11 +641,11 @@ const App = (() => {
   function resetZoom(canvasId) {
     const entry = findChart(canvasId);
     if (!entry) return;
-    const { chart, defaultMinIdx, labels } = entry;
+    const { chart, defaultMinIdx } = entry;
     if (chart.resetZoom) {
       chart.resetZoom();
     }
-    chart.options.scales.x.min = defaultMinIdx > 0 ? labels[defaultMinIdx] : undefined;
+    chart.options.scales.x.min = defaultMinIdx;
     chart.update();
   }
 
