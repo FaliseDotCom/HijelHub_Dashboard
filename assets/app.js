@@ -18,6 +18,24 @@ const App = (() => {
   let decryptedDataFiles = [];
   let chartInstances = [];
 
+  /**
+   * Repos currently on screen, in config order, with their loaded data.
+   * @type {Array<{ idx: number, owner: string, repo: string, data: Object|null }>}
+   */
+  let repoEntries = [];
+
+  /**
+   * Active sort option key and direction (1 ascending, -1 descending).
+   * @type {{ key: string, dir: number }}
+   */
+  let sortState = { key: "order", dir: 1 };
+
+  /**
+   * localStorage key that remembers the chosen sort between visits.
+   * @type {string}
+   */
+  const SORT_STORAGE_KEY = "repo-sort";
+
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   function getCSS(v) {
@@ -26,6 +44,71 @@ const App = (() => {
 
   function fmt(n) {
     return n != null ? n.toLocaleString() : "0";
+  }
+
+  /**
+   * Adds up one numeric field over a list of entries.
+   * @param {Array<Object>} list Entries to add up.
+   * @param {string} field Name of the numeric field.
+   * @returns {number} Sum of the field, 0 for an empty list.
+   */
+  function sumBy(list, field) {
+    return list.reduce((s, v) => s + (v[field] || 0), 0);
+  }
+
+  /**
+   * Formats a date as e.g. "Oct 24, 2026", independent of theme dateFormat.
+   * @param {Date} d Date to format.
+   * @returns {string} Short month, day and year.
+   */
+  function longDate(d) {
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  /**
+   * Describes how long ago a timestamp was, e.g. "today", "5d ago", "3mo ago".
+   * @param {string} iso ISO 8601 timestamp.
+   * @returns {string} Compact relative time.
+   */
+  function timeAgo(iso) {
+    const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    if (days < 1) return "today";
+    if (days < 30) return `${days}d ago`;
+    if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
+  }
+
+  /**
+   * Inner SVG markup of the small 16×16 icons used by repo badges and the
+   * sort bar, keyed by name.
+   * @type {Object<string, string>}
+   */
+  const ICONS = {
+    order: '<path d="M3 4h10M3 8h10M3 12h10"/>',
+    name: '<path d="M2 13 5 3l3 10M3.2 9.5h3.6M10 6h4l-4 7h4"/>',
+    visitors: '<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/>',
+    clones: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>',
+    referrers: '<path d="M9 2.5h4.5V7M13.5 2.5 7 9M11.5 9.5v4h-9v-9h4"/>',
+    stars: '<path d="m8 1.8 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6Z"/>',
+    forks: '<path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 0-1.5 0v.878H6.75v-.878a2.25 2.25 0 1 0-1.5 0ZM8 13.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Zm0-8.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM4.25 5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm7.5 0a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM8 9v2.5"/>',
+    issues: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5v4M8 10.5v.5"/>',
+    pulls: '<path d="M10 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM6 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM6 7v6M10 5v4"/>',
+    comments: '<path d="M2.5 3.5h11v7.5H8l-3 2.5V11H2.5Z"/>',
+    releases: '<path d="M2.5 2.5h5l6 6-5 5-6-6Z"/><circle cx="5.5" cy="5.5" r="1"/>',
+    downloads: '<path d="M8 2v8M5 7l3 3 3-3M3 13h10"/>',
+    pushed: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',
+    sort: '<path d="M5 2.5v11M2.5 11 5 13.5 7.5 11M11 13.5v-11M8.5 5 11 2.5 13.5 5"/>',
+    ascending: '<path d="M8 13V3M4 7l4-4 4 4"/>',
+    descending: '<path d="M8 3v10M4 9l4 4 4-4"/>',
+  };
+
+  /**
+   * Renders one of the ICONS as a decorative inline SVG.
+   * @param {string} name Key in ICONS.
+   * @returns {string} SVG markup.
+   */
+  function icon(name) {
+    return `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">${ICONS[name]}</svg>`;
   }
 
   /** Escapes a string for safe insertion into HTML */
@@ -257,8 +340,21 @@ const App = (() => {
     const updatedEl = document.getElementById("header-updated");
     if (updatedEl && latestUpdate) {
       const d = new Date(latestUpdate);
-      updatedEl.textContent = `Updated ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} \u00b7 ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`;
+      updatedEl.textContent = `Updated ${longDate(d)} \u00b7 ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`;
     }
+
+    repoEntries = config.repos.map((repoFullName, idx) => {
+      const [owner, repo] = repoFullName.split("/");
+      return { idx, owner, repo, data: dataFiles[idx] };
+    });
+    // A remembered sort whose data is not collected yet falls back to config order
+    if (!isSortAvailable(findSortOption(sortState.key))) {
+      sortState = { key: "order", dir: 1 };
+    }
+    if (repoEntries.length > 1) {
+      html += renderSortBar();
+    }
+    html += '<div id="repo-list">';
 
     for (let i = 0; i < config.repos.length; i++) {
       const repoFullName = config.repos[i];
@@ -272,12 +368,13 @@ const App = (() => {
       const views = data && data.data ? data.data.views || [] : [];
       const clones = data && data.data ? data.data.clones || [] : [];
       const referrers = data && data.data ? data.data.referrers || [] : [];
+      const releases = data && data.data ? data.data.releases || [] : [];
 
       // All-time totals for headline numbers
-      const totalViews = views.reduce((s, v) => s + v.count, 0);
-      const uniqueViews = views.reduce((s, v) => s + v.uniques, 0);
-      const totalClones = clones.reduce((s, v) => s + v.count, 0);
-      const uniqueClones = clones.reduce((s, v) => s + v.uniques, 0);
+      const totalViews = sumBy(views, "count");
+      const uniqueViews = sumBy(views, "uniques");
+      const totalClones = sumBy(clones, "count");
+      const uniqueClones = sumBy(clones, "uniques");
 
       const ownerEsc = esc(owner);
       const repoEsc = esc(repo);
@@ -288,7 +385,7 @@ const App = (() => {
       const dataError = !data;
 
       html += `
-      <div class="repo-section">
+      <div class="repo-section" id="repo-${idx}">
         <div class="repo-header">
           <div class="repo-avatar">
             <img src="https://avatars.githubusercontent.com/${encodeURIComponent(owner)}?s=60" alt="" onerror="this.style.display='none'; this.parentElement.textContent='${ownerInitialEsc}'">
@@ -296,22 +393,22 @@ const App = (() => {
           <a class="repo-name" href="${repoUrl}" target="_blank" rel="noopener noreferrer">
             <span class="owner">${ownerEsc} /</span> ${repoEsc}
           </a>
-          <a class="repo-badge" href="${repoUrl}/network/members" target="_blank" rel="noopener noreferrer" title="Forks">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 0-1.5 0v.878H6.75v-.878a2.25 2.25 0 1 0-1.5 0ZM8 13.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Zm0-8.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM4.25 5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm7.5 0a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM8 9v2.5"/></svg>
-            ${fmt(forks)}
-          </a>
-          <a class="repo-badge" href="${repoUrl}/issues" target="_blank" rel="noopener noreferrer" title="Issues">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6"/><path d="M8 4.5v4M8 10.5v.5"/></svg>
+          ${data && typeof data.stars === "number" ? renderBadge(`${repoUrl}/stargazers`, "Stars", "stars", fmt(data.stars)) : ""}
+          ${renderBadge(`${repoUrl}/network/members`, "Forks", "forks", fmt(forks))}
+          ${renderBadge(`${repoUrl}/issues`, "Issues", "issues", `
             <span title="Closed issues">${fmt(issues.closed)}</span>
             <span class="badge-sep">/</span>
-            <span class="${issues.open > 0 ? "badge-accent" : ""}" title="Open issues">${fmt(issues.open)}</span>
-          </a>
-          <a class="repo-badge" href="${repoUrl}/pulls" target="_blank" rel="noopener noreferrer" title="Pull requests">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M10 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM6 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM6 7v6M10 5v4"/></svg>
+            <span class="${issues.open > 0 ? "badge-accent" : ""}" title="Open issues">${fmt(issues.open)}</span>`)}
+          ${renderBadge(`${repoUrl}/pulls`, "Pull requests", "pulls", `
             <span title="Merged PRs">${fmt(pullRequests.merged)}</span>
             <span class="badge-sep">/</span>
-            <span class="${pullRequests.open > 0 ? "badge-accent" : ""}" title="Open PRs">${fmt(pullRequests.open)}</span>
-          </a>
+            <span class="${pullRequests.open > 0 ? "badge-accent" : ""}" title="Open PRs">${fmt(pullRequests.open)}</span>`)}
+          ${data && typeof data.comments === "number" ? renderBadge(`${repoUrl}/issues?q=sort%3Acomments-desc`, "Comments on issues and pull requests", "comments", fmt(data.comments)) : ""}
+          ${dataError ? "" : renderBadge(`${repoUrl}/releases`, "Releases", "releases", `
+            <span title="Releases">${fmt(releases.length)}</span>
+            <span class="badge-sep">/</span>
+            <span title="Release downloads">${fmt(sumBy(releases, "downloads"))}</span>`, "releases downloads")}
+          ${data && data.pushedAt ? renderBadge(`${repoUrl}/commits`, `Last push ${longDate(new Date(data.pushedAt))}`, "pushed", timeAgo(data.pushedAt)) : ""}
           <button class="csv-btn" data-repo-idx="${idx}" onclick="App.exportCSV(${idx})"${dataError ? " disabled" : ""}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 12V14H12V12M8 2V10M5 7L8 10L11 7"/></svg>
             CSV
@@ -320,7 +417,7 @@ const App = (() => {
         <div class="row g-3">
           <!-- Visitors -->
           <div class="col-md-4 col-12">
-            <div class="card-dash">
+            <div class="card-dash" data-sort-target="visitors">
               <div class="card-label">Visitors</div>
               ${dataError
                 ? '<div class="no-data-msg">Data not yet collected</div>'
@@ -338,7 +435,7 @@ const App = (() => {
           </div>
           <!-- Clones -->
           <div class="col-md-4 col-12">
-            <div class="card-dash">
+            <div class="card-dash" data-sort-target="clones">
               <div class="card-label">Clones</div>
               ${dataError
                 ? '<div class="no-data-msg">Data not yet collected</div>'
@@ -356,7 +453,7 @@ const App = (() => {
           </div>
           <!-- Referrers / Releases -->
           <div class="col-md-4 col-12">
-            <div class="card-dash" id="card3-${idx}">
+            <div class="card-dash" id="card3-${idx}" data-sort-target="referrers">
               <div class="tabs">
                 <div class="tab active" onclick="App.switchTab('card3-${idx}','ref')">Referrers</div>
                 <div class="tab" onclick="App.switchTab('card3-${idx}','rel')">Releases</div>
@@ -373,7 +470,9 @@ const App = (() => {
       </div>`;
     }
 
+    html += "</div>";
     main.innerHTML = html;
+    applySort();
 
     // Create charts (skip for repos with no data)
     for (let i = 0; i < config.repos.length; i++) {
@@ -404,6 +503,23 @@ const App = (() => {
     }
   }
 
+  /**
+   * Renders a pill-shaped repo header badge that links to GitHub.
+   * @param {string} href Link target.
+   * @param {string} title Tooltip describing the value.
+   * @param {string} iconName Key in ICONS.
+   * @param {string} content Badge content markup, already escaped.
+   * @param {string} [sortTarget] Space-separated sort option keys whose
+   *   values this badge shows, highlighted while sorting on them.
+   * @returns {string} Badge markup.
+   */
+  function renderBadge(href, title, iconName, content, sortTarget = iconName) {
+    return `<a class="repo-badge" href="${href}" target="_blank" rel="noopener noreferrer" title="${esc(title)}" data-sort-target="${sortTarget}">
+            ${icon(iconName)}
+            ${content}
+          </a>`;
+  }
+
   function renderReferrersTable(referrers) {
     if (referrers.length === 0) {
       return '<div class="no-data-msg">No referrer data yet</div>';
@@ -413,6 +529,240 @@ const App = (() => {
       rows += `<tr><td>${esc(r.referrer)}</td><td>${fmt(r.count)}</td><td>${fmt(r.uniques)}</td></tr>`;
     }
     return `<div class="ref-scroll-container"><table class="ref-table"><thead><tr><th>Site</th><th>Visits</th><th>Unique</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
+  // ── Sorting ──────────────────────────────────────────────────────────────
+
+  /**
+   * Returns one traffic list of a repo's data file.
+   * @param {Object|null} data Repo data file.
+   * @param {string} key "views", "clones", "referrers" or "releases".
+   * @returns {Array<Object>|null} The list, or null when no traffic data was loaded.
+   */
+  function trafficList(data, key) {
+    return data && data.data ? data.data[key] || [] : null;
+  }
+
+  /**
+   * Sort values for a daily traffic list: total count, then unique count.
+   * @param {Array<Object>|null} list Daily entries from trafficList.
+   * @returns {Array<number>} Sort values, empty when there is no data.
+   */
+  function trafficTotals(list) {
+    return list ? [sumBy(list, "count"), sumBy(list, "uniques")] : [];
+  }
+
+  /**
+   * Sort values for an "open / done" pair such as issues or pull requests:
+   * all of them, then the open ones.
+   * @param {Object|undefined} pair Counts object, e.g. { open, closed }.
+   * @param {string} doneKey Name of the finished count, "closed" or "merged".
+   * @returns {Array<number>} Sort values, empty when the counts are missing.
+   */
+  function pairTotals(pair, doneKey) {
+    return pair ? [pair.open + pair[doneKey], pair.open] : [];
+  }
+
+  /**
+   * Sort values for a single number on the data file.
+   * @param {*} value Field value.
+   * @returns {Array<number>} The number, or empty when it was not collected.
+   */
+  function numberValue(value) {
+    return typeof value === "number" ? [value] : [];
+  }
+
+  /**
+   * Options in the sort bar, in display order. `value` returns what a repo is
+   * compared on, most significant first, or an empty array when that repo has
+   * no such data; those repos always go last. `dir` is the direction picked
+   * when the option is first chosen: 1 ascending, -1 descending. `tab` is
+   * the referrers/releases card tab that lists the sorted data.
+   * @type {Array<{ key: string, label: string, title: string, dir: number, tab?: string, value: function(Object): Array }>}
+   */
+  const SORT_OPTIONS = [
+    { key: "order", label: "Default", title: "Order of config.json", dir: 1, value: (e) => [e.idx] },
+    { key: "name", label: "Name", title: "Repository name", dir: 1, value: (e) => [e.repo.toLowerCase(), e.owner.toLowerCase()] },
+    { key: "visitors", label: "Visitors", title: "All-time visitors, then unique visitors", dir: -1, value: (e) => trafficTotals(trafficList(e.data, "views")) },
+    { key: "clones", label: "Clones", title: "All-time clones, then unique clones", dir: -1, value: (e) => trafficTotals(trafficList(e.data, "clones")) },
+    { key: "referrers", label: "Referrers", title: "Visits from referring sites, then number of sites", dir: -1, tab: "ref", value: (e) => {
+      const referrers = trafficList(e.data, "referrers");
+      return referrers ? [sumBy(referrers, "count"), referrers.length] : [];
+    } },
+    { key: "stars", label: "Stars", title: "Stars", dir: -1, value: (e) => numberValue(e.data && e.data.stars) },
+    { key: "forks", label: "Forks", title: "Forks", dir: -1, value: (e) => numberValue(e.data && e.data.forks) },
+    { key: "issues", label: "Issues", title: "All issues, then open issues", dir: -1, value: (e) => pairTotals(e.data && e.data.issues, "closed") },
+    { key: "pulls", label: "PRs", title: "Merged and open pull requests, then open ones", dir: -1, value: (e) => pairTotals(e.data && e.data.pullRequests, "merged") },
+    { key: "comments", label: "Comments", title: "Comments on issues and pull requests", dir: -1, value: (e) => numberValue(e.data && e.data.comments) },
+    { key: "releases", label: "Releases", title: "Number of releases, then release downloads", dir: -1, tab: "rel", value: (e) => {
+      const releases = trafficList(e.data, "releases");
+      return releases ? [releases.length, sumBy(releases, "downloads")] : [];
+    } },
+    { key: "downloads", label: "Downloads", title: "Release downloads over all releases", dir: -1, tab: "rel", value: (e) => {
+      const releases = trafficList(e.data, "releases");
+      return releases ? [sumBy(releases, "downloads")] : [];
+    } },
+    { key: "pushed", label: "Last push", title: "Most recent push to any branch", dir: -1, value: (e) => (e.data && e.data.pushedAt ? [e.data.pushedAt] : []) },
+  ];
+
+  /**
+   * Looks up a sort option by key.
+   * @param {string} key Option key.
+   * @returns {Object|undefined} The option, or undefined when unknown.
+   */
+  function findSortOption(key) {
+    return SORT_OPTIONS.find((o) => o.key === key);
+  }
+
+  /**
+   * Explains why a sort option can't be used: no repo on screen has its data
+   * yet (older data files lack fields that later collector versions add), or
+   * every repo that has it has the same value, so sorting changes nothing.
+   * @param {Object|undefined} option Sort option.
+   * @returns {string} Reason for the tooltip, or "" when the option can be used.
+   */
+  function sortUnavailableReason(option) {
+    if (!option) return "unknown option";
+    const distinct = new Set();
+    for (const e of repoEntries) {
+      const value = option.value(e);
+      if (value.length > 0) distinct.add(JSON.stringify(value));
+    }
+    if (distinct.size === 0) return "available after the next data collection";
+    if (distinct.size === 1) return "every repo has the same value";
+    return "";
+  }
+
+  /**
+   * Tells whether sorting on an option would order the repos meaningfully.
+   * @param {Object|undefined} option Sort option.
+   * @returns {boolean} True when the option can be used.
+   */
+  function isSortAvailable(option) {
+    return sortUnavailableReason(option) === "";
+  }
+
+  /**
+   * Restores the sort chosen on a previous visit.
+   * @returns {void}
+   */
+  function loadSortState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SORT_STORAGE_KEY) || "null");
+      if (saved && findSortOption(saved.key) && (saved.dir === 1 || saved.dir === -1)) {
+        sortState = { key: saved.key, dir: saved.dir };
+      }
+    } catch {
+      // Unreadable or blocked storage keeps the default order
+    }
+  }
+
+  /**
+   * Renders the sort bar shown above the repo list.
+   * @returns {string} Sort bar markup.
+   */
+  function renderSortBar() {
+    let buttons = "";
+    for (const o of SORT_OPTIONS) {
+      const active = o.key === sortState.key;
+      const reason = sortUnavailableReason(o);
+      const available = reason === "";
+      let title = o.title;
+      if (!available) title += ` · ${reason}`;
+      else if (active) title += " · click to reverse";
+      const dirName = sortState.dir < 0 ? "descending" : "ascending";
+      buttons += `<button type="button" class="sort-btn${active ? " active" : ""}" data-sort="${o.key}" title="${title}" aria-pressed="${active}"${available ? "" : ' aria-disabled="true"'} onclick="App.setSort('${o.key}')">
+                ${icon(o.key)}
+                <span>${o.label}</span>
+                ${active ? `<span class="sort-dir">${icon(dirName)}<span class="visually-hidden">, ${dirName}</span></span>` : ""}
+              </button>`;
+    }
+    return `<div class="sort-bar" id="sort-bar" role="toolbar" aria-label="Sort repositories">
+              <span class="sort-label">${icon("sort")}</span>
+              ${buttons}
+            </div>`;
+  }
+
+  /**
+   * Compares two repos for the active sort. Repos without data for it go
+   * last in either direction; ties keep config order.
+   * @param {{ entry: Object, value: Array }} a First repo and its sort values.
+   * @param {{ entry: Object, value: Array }} b Second repo and its sort values.
+   * @returns {number} Negative when a comes first, positive when b does.
+   */
+  function compareRepos(a, b) {
+    if (a.value.length === 0 || b.value.length === 0) {
+      return (b.value.length - a.value.length) || (a.entry.idx - b.entry.idx);
+    }
+    for (let i = 0; i < a.value.length; i++) {
+      const x = a.value[i];
+      const y = b.value[i];
+      const diff = typeof x === "string" ? x.localeCompare(y) : x - y;
+      if (diff !== 0) return diff * sortState.dir;
+    }
+    return a.entry.idx - b.entry.idx;
+  }
+
+  /**
+   * Shows where the sorted values are: highlights the badges and cards that
+   * hold them and, for referrers and releases, opens the tab that lists them.
+   * @returns {void}
+   */
+  function showSortTarget() {
+    const key = sortState.key;
+    document.querySelectorAll("[data-sort-target]").forEach((el) => {
+      el.classList.toggle("sorted", el.dataset.sortTarget.split(" ").includes(key));
+    });
+    const option = findSortOption(key);
+    if (!option || !option.tab) return;
+    for (const entry of repoEntries) {
+      switchTab(`card3-${entry.idx}`, option.tab);
+    }
+  }
+
+  /**
+   * Reorders the repo sections on screen for the active sort. Sections are
+   * moved rather than re-rendered, so charts keep their zoom and pan.
+   * @returns {void}
+   */
+  function applySort() {
+    showSortTarget();
+    const list = document.getElementById("repo-list");
+    const option = findSortOption(sortState.key);
+    if (!list || !option) return;
+    const sorted = repoEntries
+      .map((entry) => ({ entry, value: option.value(entry) }))
+      .sort(compareRepos);
+    for (const { entry } of sorted) {
+      list.appendChild(document.getElementById(`repo-${entry.idx}`));
+    }
+  }
+
+  /**
+   * Sorts the repos by an option; choosing the active option again reverses
+   * the direction. The choice is remembered for the next visit.
+   * @param {string} key Sort option key.
+   * @returns {void}
+   */
+  function setSort(key) {
+    const option = findSortOption(key);
+    if (!isSortAvailable(option)) return;
+    sortState = key === sortState.key
+      ? { key, dir: -sortState.dir }
+      : { key, dir: option.dir };
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sortState));
+    } catch {
+      // The sort still applies for this visit
+    }
+
+    const bar = document.getElementById("sort-bar");
+    if (bar) {
+      const hadFocus = bar.contains(document.activeElement);
+      bar.outerHTML = renderSortBar();
+      if (hadFocus) document.querySelector(`#sort-bar [data-sort="${key}"]`).focus();
+    }
+    applySort();
   }
 
   // ── Charts ───────────────────────────────────────────────────────────────
@@ -634,6 +984,7 @@ const App = (() => {
 
   async function init() {
     await loadTheme();
+    loadSortState();
 
     const config = await loadConfig();
     if (config.repos.length === 0) {
@@ -683,6 +1034,7 @@ const App = (() => {
     init,
     toggleTheme,
     switchTab,
+    setSort,
     resetZoom,
     exportCSV,
     handleDecrypt,

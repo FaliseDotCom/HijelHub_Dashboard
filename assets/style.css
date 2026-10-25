@@ -147,6 +147,36 @@ body {
 .skeleton-header { height: 30px; width: 240px; margin-bottom: 14px; }
 .skeleton-card { height: 260px; border-radius: var(--radius-lg); }
 
+/* ── Sort bar ───────────────────────────────────────────────────────────── */
+
+.sort-bar {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 5px; margin-bottom: 24px;
+}
+
+.sort-label { display: inline-flex; color: var(--tx3); margin-right: 2px; }
+.sort-label svg { width: 14px; height: 14px; }
+
+.sort-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-family: var(--font-m);
+  color: var(--tx3); background: var(--bg2);
+  border: 1px solid var(--border); border-radius: 20px;
+  padding: 4px 9px 4px 7px; cursor: pointer; transition: all 0.15s;
+}
+
+.sort-btn:hover:not(.active):not([aria-disabled="true"]) { background: var(--bg3); color: var(--tx2); }
+.sort-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sort-btn svg { width: 12px; height: 12px; }
+.sort-btn[aria-disabled="true"] { opacity: 0.45; cursor: default; }
+
+.sort-btn.active {
+  background: var(--accent-soft); color: var(--accent);
+  border-color: var(--accent); font-weight: 500;
+}
+
+.sort-dir { display: inline-flex; margin-left: -1px; }
+
 /* ── Repo sections ──────────────────────────────────────────────────────── */
 
 .repo-section { margin-bottom: 36px; }
@@ -190,6 +220,10 @@ body {
 
 .repo-badge:hover { background: var(--bg3); color: var(--tx2); text-decoration: none; }
 .repo-badge svg { width: 12px; height: 12px; opacity: 0.6; }
+
+/* Badge or card holding the values the repos are sorted on */
+.repo-badge.sorted, .card-dash.sorted { border-color: var(--accent); }
+.repo-badge.sorted { color: var(--accent); }
 
 .badge-sep { opacity: 0.35; margin: 0 1px; }
 
