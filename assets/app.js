@@ -88,13 +88,16 @@ const App = (() => {
     name: '<path d="M2 13 5 3l3 10M3.2 9.5h3.6M10 6h4l-4 7h4"/>',
     visitors: '<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/>',
     clones: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>',
+    referrers: '<path d="M9 2.5h4.5V7M13.5 2.5 7 9M11.5 9.5v4h-9v-9h4"/>',
     stars: '<path d="m8 1.8 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6Z"/>',
     forks: '<path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 0-1.5 0v.878H6.75v-.878a2.25 2.25 0 1 0-1.5 0ZM8 13.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Zm0-8.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM4.25 5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm7.5 0a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM8 9v2.5"/>',
     issues: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5v4M8 10.5v.5"/>',
     pulls: '<path d="M10 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM6 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM6 7v6M10 5v4"/>',
     comments: '<path d="M2.5 3.5h11v7.5H8l-3 2.5V11H2.5Z"/>',
+    releases: '<path d="M2.5 2.5h5l6 6-5 5-6-6Z"/><circle cx="5.5" cy="5.5" r="1"/>',
     downloads: '<path d="M8 2v8M5 7l3 3 3-3M3 13h10"/>',
     pushed: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',
+    sort: '<path d="M5 2.5v11M2.5 11 5 13.5 7.5 11M11 13.5v-11M8.5 5 11 2.5 13.5 5"/>',
     ascending: '<path d="M8 13V3M4 7l4-4 4 4"/>',
     descending: '<path d="M8 3v10M4 9l4 4 4-4"/>',
   };
@@ -552,7 +555,7 @@ const App = (() => {
   /**
    * Returns one traffic list of a repo's data file.
    * @param {Object|null} data Repo data file.
-   * @param {string} key "views", "clones" or "releases".
+   * @param {string} key "views", "clones", "referrers" or "releases".
    * @returns {Array<Object>|null} The list, or null when no traffic data was loaded.
    */
   function trafficList(data, key) {
@@ -600,11 +603,19 @@ const App = (() => {
     { key: "name", label: "Name", title: "Repository name", dir: 1, value: (e) => [e.repo.toLowerCase(), e.owner.toLowerCase()] },
     { key: "visitors", label: "Visitors", title: "All-time visitors, then unique visitors", dir: -1, value: (e) => trafficTotals(trafficList(e.data, "views")) },
     { key: "clones", label: "Clones", title: "All-time clones, then unique clones", dir: -1, value: (e) => trafficTotals(trafficList(e.data, "clones")) },
+    { key: "referrers", label: "Referrers", title: "Visits from referring sites, then number of sites", dir: -1, value: (e) => {
+      const referrers = trafficList(e.data, "referrers");
+      return referrers ? [sumBy(referrers, "count"), referrers.length] : [];
+    } },
     { key: "stars", label: "Stars", title: "Stars", dir: -1, value: (e) => numberValue(e.data && e.data.stars) },
     { key: "forks", label: "Forks", title: "Forks", dir: -1, value: (e) => numberValue(e.data && e.data.forks) },
     { key: "issues", label: "Issues", title: "All issues, then open issues", dir: -1, value: (e) => pairTotals(e.data && e.data.issues, "closed") },
-    { key: "pulls", label: "Pull requests", title: "Merged and open pull requests, then open ones", dir: -1, value: (e) => pairTotals(e.data && e.data.pullRequests, "merged") },
+    { key: "pulls", label: "PRs", title: "Merged and open pull requests, then open ones", dir: -1, value: (e) => pairTotals(e.data && e.data.pullRequests, "merged") },
     { key: "comments", label: "Comments", title: "Comments on issues and pull requests", dir: -1, value: (e) => numberValue(e.data && e.data.comments) },
+    { key: "releases", label: "Releases", title: "Number of releases, then release downloads", dir: -1, value: (e) => {
+      const releases = trafficList(e.data, "releases");
+      return releases ? [releases.length, sumBy(releases, "downloads")] : [];
+    } },
     { key: "downloads", label: "Downloads", title: "Release downloads over all releases", dir: -1, value: (e) => {
       const releases = trafficList(e.data, "releases");
       return releases ? [sumBy(releases, "downloads")] : [];
@@ -666,7 +677,7 @@ const App = (() => {
               </button>`;
     }
     return `<div class="sort-bar" id="sort-bar" role="toolbar" aria-label="Sort repositories">
-              <span class="sort-label">Sort by</span>
+              <span class="sort-label">${icon("sort")}</span>
               ${buttons}
             </div>`;
   }
