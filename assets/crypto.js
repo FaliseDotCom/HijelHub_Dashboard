@@ -57,19 +57,12 @@ const DashCrypto = (() => {
   }
 
   async function decryptDataFile(fileObj, password) {
-    const dataJson = await decrypt(
-      fileObj.ciphertext,
-      fileObj.iv,
-      fileObj.salt,
-      password
-    );
+    // Keep every unencrypted summary field (repo, counts, dates)
+    const { ciphertext, iv, salt, ...summary } = fileObj;
+    const dataJson = await decrypt(ciphertext, iv, salt, password);
     return {
+      ...summary,
       format: "plaintext",
-      repo: fileObj.repo,
-      updated: fileObj.updated,
-      forks: fileObj.forks,
-      issues: fileObj.issues,
-      pullRequests: fileObj.pullRequests,
       data: JSON.parse(dataJson),
     };
   }

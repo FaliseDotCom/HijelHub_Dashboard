@@ -31,6 +31,30 @@ const DATA_DIR = path.join(__dirname, "..", "data");
 // ── HTTP helper ──────────────────────────────────────────────────────────────
 
 function apiGet(endpoint) {
+  return apiRequest(endpoint).then((res) => res.body);
+}
+
+/**
+ * Counts the items of a paginated list endpoint with a single request.
+ * Asks for one item per page, so the page number of the "last" link equals
+ * the total; without that link the list has at most one item. GitHub stops
+ * paging very large lists, so the count tops out for huge repositories.
+ * @param {string} endpoint API path of a list endpoint, without paging parameters.
+ * @returns {Promise<number>} Total number of items in the list.
+ */
+async function apiCount(endpoint) {
+  const { headers, body } = await apiRequest(`${endpoint}?per_page=1`);
+  const last = /[?&]page=(\d+)>; rel="last"/.exec(headers.link || "");
+  if (last) return parseInt(last[1], 10);
+  return Array.isArray(body) ? body.length : 0;
+}
+
+/**
+ * Sends an authenticated GET request to the GitHub REST API.
+ * @param {string} endpoint API path, including any query string.
+ * @returns {Promise<{ headers: Object, body: * }>} Response headers and parsed JSON body.
+ */
+function apiRequest(endpoint) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: "api.github.com",
@@ -50,7 +74,7 @@ function apiGet(endpoint) {
       res.on("end", () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           try {
-            resolve(JSON.parse(body));
+            resolve({ headers: res.headers, body: JSON.parse(body) });
           } catch {
             reject(new Error(`Invalid JSON from ${endpoint}: ${body}`));
           }
@@ -195,13 +219,29 @@ async function processRepo(repoFullName) {
     console.log(`  ⚠  Could not fetch issue/PR counts: ${err.message}`);
   }
 
+  // Comments on issues and PR conversations, plus PR review comments. Left
+  // out when unavailable (private repos need Issues and Pull requests read
+  // access), so the dashboard hides it instead of showing a false 0
+  let comments = null;
+  try {
+    const [issueComments, reviewComments] = await Promise.all([
+      apiCount(`/repos/${owner}/${repo}/issues/comments`),
+      apiCount(`/repos/${owner}/${repo}/pulls/comments`),
+    ]);
+    comments = issueComments + reviewComments;
+  } catch (err) {
+    console.log(`  ⚠  Could not fetch comment count: ${err.message}`);
+  }
+
   console.log(`  Views: ${views.count} total, ${views.uniques} unique (${views.views?.length || 0} days)`);
   console.log(`  Clones: ${clones.count} total, ${clones.uniques} unique (${clones.clones?.length || 0} days)`);
   console.log(`  Referrers: ${referrers.length} sources`);
   console.log(`  Releases: ${Array.isArray(releases) ? releases.length : 0} found`);
   console.log(`  Issues: ${closedIssues} closed, ${openIssues} open`);
   console.log(`  PRs: ${mergedPRs} merged, ${openPRs} open`);
-  console.log(`  Forks: ${repoMeta.forks_count}`);
+  console.log(`  Comments: ${comments ?? "unavailable"}`);
+  console.log(`  Stars: ${repoMeta.stargazers_count}, forks: ${repoMeta.forks_count}`);
+  console.log(`  Last push: ${repoMeta.pushed_at}`);
 
   // Build releases summary (tag + total download count across all assets)
   const releaseSummary = Array.isArray(releases)
@@ -216,9 +256,12 @@ async function processRepo(repoFullName) {
     format: "plaintext",
     repo: repoFullName,
     updated: new Date().toISOString(),
+    pushedAt: repoMeta.pushed_at || "",
+    stars: repoMeta.stargazers_count || 0,
     forks: repoMeta.forks_count || 0,
     issues: { closed: closedIssues, open: openIssues },
     pullRequests: { merged: mergedPRs, open: openPRs },
+    ...(comments !== null && { comments }),
     data: {
       views: mergeDailyData(existing.data.views || [], views.views || []),
       clones: mergeDailyData(existing.data.clones || [], clones.clones || []),

@@ -34,6 +34,7 @@ This dashboard solves all these problems using only GitHub's free tier: Actions,
 - 🌓 **Light/dark mode** — toggle with persistent preference
 - 📱 **Responsive** — works on desktop, tablet, and mobile
 - 📥 **CSV export** — download per-repo traffic data
+- ↕️ **Sorting** — order repos by visitors, clones, stars, forks, issues, pull requests, comments, release downloads or last push; the choice is remembered per browser
 - 🎨 **Fully themeable** — customize colors, fonts, and branding via `theme.json`
 - 🆓 **100% free** — runs entirely on GitHub Free tier
 
@@ -54,6 +55,7 @@ Click **Fork** on the [original repository](https://github.com/HijelHub/HijelHub
 4. Under **Permissions**, enable:
    - **Administration**: Read-only
    - **Metadata**: Read-only
+   - *(Optional)* **Issues** and **Pull requests**: Read-only — only needed to count comments on private repos
 5. Click **Generate token** and copy the value
 
 > [!NOTE]
