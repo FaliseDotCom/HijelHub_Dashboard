@@ -641,13 +641,31 @@ const App = (() => {
   }
 
   /**
-   * Tells whether at least one repo on screen has data for a sort option.
-   * Older data files lack fields that later collector versions add.
+   * Explains why a sort option can't be used: no repo on screen has its data
+   * yet (older data files lack fields that later collector versions add), or
+   * every repo that has it has the same value, so sorting changes nothing.
+   * @param {Object|undefined} option Sort option.
+   * @returns {string} Reason for the tooltip, or "" when the option can be used.
+   */
+  function sortUnavailableReason(option) {
+    if (!option) return "unknown option";
+    const distinct = new Set();
+    for (const e of repoEntries) {
+      const value = option.value(e);
+      if (value.length > 0) distinct.add(JSON.stringify(value));
+    }
+    if (distinct.size === 0) return "available after the next data collection";
+    if (distinct.size === 1) return "every repo has the same value";
+    return "";
+  }
+
+  /**
+   * Tells whether sorting on an option would order the repos meaningfully.
    * @param {Object|undefined} option Sort option.
    * @returns {boolean} True when the option can be used.
    */
   function isSortAvailable(option) {
-    return !!option && repoEntries.some((e) => option.value(e).length > 0);
+    return sortUnavailableReason(option) === "";
   }
 
   /**
@@ -673,9 +691,10 @@ const App = (() => {
     let buttons = "";
     for (const o of SORT_OPTIONS) {
       const active = o.key === sortState.key;
-      const available = isSortAvailable(o);
+      const reason = sortUnavailableReason(o);
+      const available = reason === "";
       let title = o.title;
-      if (!available) title += " · available after the next data collection";
+      if (!available) title += ` · ${reason}`;
       else if (active) title += " · click to reverse";
       const dirName = sortState.dir < 0 ? "descending" : "ascending";
       buttons += `<button type="button" class="sort-btn${active ? " active" : ""}" data-sort="${o.key}" title="${title}" aria-pressed="${active}"${available ? "" : ' aria-disabled="true"'} onclick="App.setSort('${o.key}')">
