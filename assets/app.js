@@ -283,6 +283,11 @@ const App = (() => {
     return rawDataFiles.some((f) => f && f.format === "encrypted");
   }
 
+  function showDecryptModal() {
+    document.getElementById("decrypt-modal").classList.remove("hidden");
+    document.getElementById("decrypt-pw").focus();
+  }
+
   async function attemptDecrypt(password) {
     const errEl = document.getElementById("decrypt-err");
     if (!password) {
@@ -1098,11 +1103,11 @@ const App = (() => {
         const ok = await attemptDecrypt(cachedPw);
         if (!ok) {
           sessionStorage.removeItem("dash-pw");
-          document.getElementById("decrypt-modal").classList.remove("hidden");
+          showDecryptModal();
           return;
         }
       } else {
-        document.getElementById("decrypt-modal").classList.remove("hidden");
+        showDecryptModal();
         return;
       }
     } else {
