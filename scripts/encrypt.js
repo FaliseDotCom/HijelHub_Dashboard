@@ -109,12 +109,14 @@ function processFile(filepath) {
 
   const { iv, salt, ciphertext } = encrypt(dataToEncrypt, ENCRYPT_KEY);
 
-  // Keep the top-level summary fields (repo, counts, dates) readable; only
-  // the traffic data and the previous cipher fields are replaced
-  const { data: _data, ciphertext: _ciphertext, iv: _iv, salt: _salt, ...summary } = raw;
   const encryptedFile = {
-    ...summary,
     format: "encrypted",
+    repo: raw.repo,
+    updated: raw.updated,
+    stars: raw.stars,
+    forks: raw.forks,
+    issues: raw.issues,
+    pullRequests: raw.pullRequests,
     iv,
     salt,
     ciphertext,
