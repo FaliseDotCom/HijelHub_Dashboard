@@ -31,6 +31,13 @@ const App = (() => {
   let sortState = { key: "order", dir: 1 };
 
   /**
+   * Whether the sort menu of narrow screens is open. Kept here because the
+   * sort bar is re-rendered on every sort change while the menu stays open.
+   * @type {boolean}
+   */
+  let sortMenuOpen = false;
+
+  /**
    * localStorage key that remembers the chosen sort between visits.
    * @type {string}
    */
@@ -93,13 +100,13 @@ const App = (() => {
     forks: '<path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 0-1.5 0v.878H6.75v-.878a2.25 2.25 0 1 0-1.5 0ZM8 13.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Zm0-8.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM4.25 5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm7.5 0a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM8 9v2.5"/>',
     issues: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5v4M8 10.5v.5"/>',
     pulls: '<path d="M10 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM6 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM6 7v6M10 5v4"/>',
-    comments: '<path d="M2.5 3.5h11v7.5H8l-3 2.5V11H2.5Z"/>',
     releases: '<path d="M2.5 2.5h5l6 6-5 5-6-6Z"/><circle cx="5.5" cy="5.5" r="1"/>',
     downloads: '<path d="M8 2v8M5 7l3 3 3-3M3 13h10"/>',
     pushed: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',
     sort: '<path d="M5 2.5v11M2.5 11 5 13.5 7.5 11M11 13.5v-11M8.5 5 11 2.5 13.5 5"/>',
     ascending: '<path d="M8 13V3M4 7l4-4 4 4"/>',
     descending: '<path d="M8 3v10M4 9l4 4 4-4"/>',
+    chevron: '<path d="m4 6 4 4 4-4"/>',
   };
 
   /**
@@ -368,7 +375,7 @@ const App = (() => {
       const views = data && data.data ? data.data.views || [] : [];
       const clones = data && data.data ? data.data.clones || [] : [];
       const referrers = data && data.data ? data.data.referrers || [] : [];
-      const releases = data && data.data ? data.data.releases || [] : [];
+      const pushedAt = lastPush(data);
 
       // All-time totals for headline numbers
       const totalViews = sumBy(views, "count");
@@ -403,12 +410,7 @@ const App = (() => {
             <span title="Merged PRs">${fmt(pullRequests.merged)}</span>
             <span class="badge-sep">/</span>
             <span class="${pullRequests.open > 0 ? "badge-accent" : ""}" title="Open PRs">${fmt(pullRequests.open)}</span>`)}
-          ${data && typeof data.comments === "number" ? renderBadge(`${repoUrl}/issues?q=sort%3Acomments-desc`, "Comments on issues and pull requests", "comments", fmt(data.comments)) : ""}
-          ${dataError ? "" : renderBadge(`${repoUrl}/releases`, "Releases", "releases", `
-            <span title="Releases">${fmt(releases.length)}</span>
-            <span class="badge-sep">/</span>
-            <span title="Release downloads">${fmt(sumBy(releases, "downloads"))}</span>`, "releases downloads")}
-          ${data && data.pushedAt ? renderBadge(`${repoUrl}/commits`, `Last push ${longDate(new Date(data.pushedAt))}`, "pushed", timeAgo(data.pushedAt)) : ""}
+          ${pushedAt ? renderBadge(`${repoUrl}/commits`, `Last push ${longDate(new Date(pushedAt))}`, "pushed", timeAgo(pushedAt)) : ""}
           <button class="csv-btn" data-repo-idx="${idx}" onclick="App.exportCSV(${idx})"${dataError ? " disabled" : ""}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 12V14H12V12M8 2V10M5 7L8 10L11 7"/></svg>
             CSV
@@ -453,7 +455,7 @@ const App = (() => {
           </div>
           <!-- Referrers / Releases -->
           <div class="col-md-4 col-12">
-            <div class="card-dash" id="card3-${idx}" data-sort-target="referrers">
+            <div class="card-dash" id="card3-${idx}" data-sort-target="referrers releases downloads">
               <div class="tabs">
                 <div class="tab active" onclick="App.switchTab('card3-${idx}','ref')">Referrers</div>
                 <div class="tab" onclick="App.switchTab('card3-${idx}','rel')">Releases</div>
@@ -507,14 +509,13 @@ const App = (() => {
    * Renders a pill-shaped repo header badge that links to GitHub.
    * @param {string} href Link target.
    * @param {string} title Tooltip describing the value.
-   * @param {string} iconName Key in ICONS.
+   * @param {string} iconName Key in ICONS, also the sort option key whose
+   *   values the badge shows, so it is highlighted while sorting on them.
    * @param {string} content Badge content markup, already escaped.
-   * @param {string} [sortTarget] Space-separated sort option keys whose
-   *   values this badge shows, highlighted while sorting on them.
    * @returns {string} Badge markup.
    */
-  function renderBadge(href, title, iconName, content, sortTarget = iconName) {
-    return `<a class="repo-badge" href="${href}" target="_blank" rel="noopener noreferrer" title="${esc(title)}" data-sort-target="${sortTarget}">
+  function renderBadge(href, title, iconName, content) {
+    return `<a class="repo-badge" href="${href}" target="_blank" rel="noopener noreferrer" title="${esc(title)}" data-sort-target="${iconName}">
             ${icon(iconName)}
             ${content}
           </a>`;
@@ -541,6 +542,16 @@ const App = (() => {
    */
   function trafficList(data, key) {
     return data && data.data ? data.data[key] || [] : null;
+  }
+
+  /**
+   * Returns when anything was last pushed to a repo. It is kept inside the
+   * (encrypted) traffic data, so it is only known once that is readable.
+   * @param {Object|null} data Repo data file.
+   * @returns {string} ISO 8601 timestamp, or "" when it is not collected yet.
+   */
+  function lastPush(data) {
+    return (data && data.data && data.data.pushedAt) || "";
   }
 
   /**
@@ -593,7 +604,6 @@ const App = (() => {
     { key: "forks", label: "Forks", title: "Forks", dir: -1, value: (e) => numberValue(e.data && e.data.forks) },
     { key: "issues", label: "Issues", title: "All issues, then open issues", dir: -1, value: (e) => pairTotals(e.data && e.data.issues, "closed") },
     { key: "pulls", label: "PRs", title: "Merged and open pull requests, then open ones", dir: -1, value: (e) => pairTotals(e.data && e.data.pullRequests, "merged") },
-    { key: "comments", label: "Comments", title: "Comments on issues and pull requests", dir: -1, value: (e) => numberValue(e.data && e.data.comments) },
     { key: "releases", label: "Releases", title: "Number of releases, then release downloads", dir: -1, tab: "rel", value: (e) => {
       const releases = trafficList(e.data, "releases");
       return releases ? [releases.length, sumBy(releases, "downloads")] : [];
@@ -602,7 +612,7 @@ const App = (() => {
       const releases = trafficList(e.data, "releases");
       return releases ? [sumBy(releases, "downloads")] : [];
     } },
-    { key: "pushed", label: "Last push", title: "Most recent push to any branch", dir: -1, value: (e) => (e.data && e.data.pushedAt ? [e.data.pushedAt] : []) },
+    { key: "pushed", label: "Last push", title: "Most recent push to any branch", dir: -1, value: (e) => (lastPush(e.data) ? [lastPush(e.data)] : []) },
   ];
 
   /**
@@ -658,10 +668,14 @@ const App = (() => {
   }
 
   /**
-   * Renders the sort bar shown above the repo list.
+   * Renders the sort bar shown above the repo list. Narrow screens show only
+   * a button with the active sort, which opens the same option buttons as a
+   * menu (see the stylesheet's sort menu rules).
    * @returns {string} Sort bar markup.
    */
   function renderSortBar() {
+    const dirName = sortState.dir < 0 ? "descending" : "ascending";
+    const dirIcon = `<span class="sort-dir">${icon(dirName)}<span class="visually-hidden">, ${dirName}</span></span>`;
     let buttons = "";
     for (const o of SORT_OPTIONS) {
       const active = o.key === sortState.key;
@@ -670,17 +684,77 @@ const App = (() => {
       let title = o.title;
       if (!available) title += ` · ${reason}`;
       else if (active) title += " · click to reverse";
-      const dirName = sortState.dir < 0 ? "descending" : "ascending";
       buttons += `<button type="button" class="sort-btn${active ? " active" : ""}" data-sort="${o.key}" title="${title}" aria-pressed="${active}"${available ? "" : ' aria-disabled="true"'} onclick="App.setSort('${o.key}')">
                 ${icon(o.key)}
                 <span>${o.label}</span>
-                ${active ? `<span class="sort-dir">${icon(dirName)}<span class="visually-hidden">, ${dirName}</span></span>` : ""}
+                ${active ? dirIcon : ""}
               </button>`;
     }
-    return `<div class="sort-bar" id="sort-bar" role="toolbar" aria-label="Sort repositories">
-              <span class="sort-label">${icon("sort")}</span>
-              ${buttons}
+    const current = findSortOption(sortState.key);
+    return `<div class="sort-bar" id="sort-bar">
+              <span class="sort-label" id="sort-label">${icon("sort")}Sort by</span>
+              <div class="sort-select${sortMenuOpen ? " open" : ""}" id="sort-select" onpointerleave="App.leaveSortMenu(event)">
+                <button type="button" class="sort-btn sort-toggle active" id="sort-toggle" title="Choose how to sort" aria-labelledby="sort-label sort-toggle" aria-expanded="${sortMenuOpen}" aria-controls="sort-options" onclick="App.toggleSortMenu()">
+                  ${icon(current.key)}
+                  <span>${current.label}</span>
+                  ${dirIcon}
+                  <span class="sort-chevron">${icon("chevron")}</span>
+                </button>
+                <div class="sort-options" id="sort-options" role="toolbar" aria-labelledby="sort-label">
+                  ${buttons}
+                </div>
+              </div>
             </div>`;
+  }
+
+  /**
+   * Opens or closes the sort menu of narrow screens.
+   * @param {boolean} open True to open the menu.
+   * @returns {void}
+   */
+  function setSortMenu(open) {
+    sortMenuOpen = open;
+    const select = document.getElementById("sort-select");
+    if (!select) return;
+    select.classList.toggle("open", open);
+    document.getElementById("sort-toggle").setAttribute("aria-expanded", String(open));
+  }
+
+  /**
+   * Opens the sort menu, or closes it when it is open.
+   * @returns {void}
+   */
+  function toggleSortMenu() {
+    setSortMenu(!sortMenuOpen);
+  }
+
+  /**
+   * Closes the sort menu when the mouse moves out of it. Touch and pen
+   * pointers also "leave" after every tap, so for them the menu stays open
+   * until a tap outside it.
+   * @param {PointerEvent} event The pointerleave event.
+   * @returns {void}
+   */
+  function leaveSortMenu(event) {
+    if (event.pointerType === "mouse") setSortMenu(false);
+  }
+
+  /**
+   * Closes the sort menu when a click, tap or keyboard focus lands outside
+   * it, or when Escape is pressed.
+   * @param {Event} event A pointerdown, focusin or keydown event on the document.
+   * @returns {void}
+   */
+  function closeSortMenuOutside(event) {
+    const select = document.getElementById("sort-select");
+    if (!sortMenuOpen || !select) return;
+    if (event.type === "keydown") {
+      if (event.key !== "Escape") return;
+      if (select.contains(document.activeElement)) document.getElementById("sort-toggle").focus();
+    } else if (select.contains(event.target)) {
+      return;
+    }
+    setSortMenu(false);
   }
 
   /**
@@ -985,6 +1059,9 @@ const App = (() => {
   async function init() {
     await loadTheme();
     loadSortState();
+    for (const type of ["pointerdown", "focusin", "keydown"]) {
+      document.addEventListener(type, closeSortMenuOutside);
+    }
 
     const config = await loadConfig();
     if (config.repos.length === 0) {
@@ -1035,6 +1112,8 @@ const App = (() => {
     toggleTheme,
     switchTab,
     setSort,
+    toggleSortMenu,
+    leaveSortMenu,
     resetZoom,
     exportCSV,
     handleDecrypt,
