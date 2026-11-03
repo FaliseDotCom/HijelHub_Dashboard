@@ -28,14 +28,14 @@ This dashboard solves all these problems using only GitHub's free tier: Actions,
 
 ## Features
 
-- 📊 **Historical data preservation** — daily cron workflow accumulates traffic data beyond the 14-day API limit
-- 📈 **Multi-repo overview** — view all your repos' traffic on one page, any repo you have write access to.
-- 🔒 **Optional AES-256-GCM encryption** — encrypt traffic data at rest for public repos
-- 🌓 **Light/dark mode** — toggle with persistent preference
-- 📱 **Responsive** — works on desktop, tablet, and mobile
-- 📥 **CSV export** — download per-repo traffic data
-- 🎨 **Fully themeable** — customize colors, fonts, and branding via `theme.json`
-- 🆓 **100% free** — runs entirely on GitHub Free tier
+- **Historical data preservation** — daily cron workflow accumulates traffic data beyond the 14-day API limit
+- **Multi-repo overview** — view all your repos' traffic on one page, any repo you have write access to.
+- **Optional AES-256-GCM encryption** — encrypt traffic data at rest for public repos
+- **Light/dark mode** — toggle with persistent preference
+- **Responsive** — works on desktop, tablet, and mobile
+- **CSV export** — download per-repo traffic data
+- **Fully themeable** — customize colors, fonts, and branding via `theme.json`
+- **100% free** — runs entirely on GitHub Free tier
 
 ## Quick Setup
 
