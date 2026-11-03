@@ -31,7 +31,7 @@ const App = (() => {
   let sortState = { key: "order", dir: 1 };
 
   /**
-   * Whether the sort menu of narrow screens is open. Kept here because the
+   * Whether the sort menu is open. Kept here because the
    * sort bar is re-rendered on every sort change while the menu stays open.
    * @type {boolean}
    */
@@ -698,17 +698,20 @@ const App = (() => {
   }
 
   /**
-   * Renders the sort bar shown above the repo list. Narrow screens show only
-   * a button with the active sort, which opens the same option buttons as a
-   * menu (see the stylesheet's sort menu rules).
+   * Renders the sort bar shown above the repo list: a button with the active
+   * sort that opens the option buttons as a menu. The button holds every
+   * option's label stacked on top of each other, only the active one visible,
+   * so it is as wide as the open menu whichever option is active.
    * @returns {string} Sort bar markup.
    */
   function renderSortBar() {
     const dirName = sortState.dir < 0 ? "descending" : "ascending";
     const dirIcon = `<span class="sort-dir">${icon(dirName)}<span class="visually-hidden">, ${dirName}</span></span>`;
     let buttons = "";
+    let faces = "";
     for (const o of SORT_OPTIONS) {
       const active = o.key === sortState.key;
+      faces += `<span${active ? "" : ' class="sort-sizer"'}>${icon(o.key)}${o.label}${dirIcon}</span>`;
       const reason = sortUnavailableReason(o);
       const available = reason === "";
       let title = o.title;
@@ -720,14 +723,11 @@ const App = (() => {
                 ${active ? dirIcon : ""}
               </button>`;
     }
-    const current = findSortOption(sortState.key);
     return `<div class="sort-bar" id="sort-bar">
               <span class="sort-label" id="sort-label">${icon("sort")}Sort by</span>
               <div class="sort-select${sortMenuOpen ? " open" : ""}" id="sort-select" onpointerleave="App.leaveSortMenu(event)">
                 <button type="button" class="sort-btn sort-toggle active" id="sort-toggle" title="Choose how to sort" aria-labelledby="sort-label sort-toggle" aria-expanded="${sortMenuOpen}" aria-controls="sort-options" onclick="App.toggleSortMenu()">
-                  ${icon(current.key)}
-                  <span>${current.label}</span>
-                  ${dirIcon}
+                  <span class="sort-current">${faces}</span>
                   <span class="sort-chevron">${icon("chevron")}</span>
                 </button>
                 <div class="sort-options" id="sort-options" role="toolbar" aria-labelledby="sort-label">
@@ -738,7 +738,7 @@ const App = (() => {
   }
 
   /**
-   * Opens or closes the sort menu of narrow screens.
+   * Opens or closes the sort menu.
    * @param {boolean} open True to open the menu.
    * @returns {void}
    */
