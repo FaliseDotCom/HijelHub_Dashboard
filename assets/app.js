@@ -332,13 +332,7 @@ const App = (() => {
                 : `<div class="card-value">${fmt(totalViews)}</div>
               <div class="card-sub"><strong>${fmt(uniqueViews)}</strong> unique</div>
               <div class="chart-wrap"><canvas id="visitors-${idx}"></canvas></div>
-              <div class="chart-controls">
-                <div class="chart-legend">
-                  <div class="chart-legend-item"><div class="legend-line" style="border-color:var(--chart1)"></div>Total</div>
-                  <div class="chart-legend-item"><div class="legend-line dashed" style="border-color:var(--chart2)"></div>Unique</div>
-                </div>
-                <button class="chart-reset" onclick="App.resetZoom('visitors-${idx}')">Reset zoom</button>
-              </div>`}
+              ${renderChartControls(`visitors-${idx}`)}`}
             </div>
           </div>
           <!-- Clones -->
@@ -350,13 +344,7 @@ const App = (() => {
                 : `<div class="card-value">${fmt(totalClones)}</div>
               <div class="card-sub"><strong>${fmt(uniqueClones)}</strong> unique</div>
               <div class="chart-wrap"><canvas id="clones-${idx}"></canvas></div>
-              <div class="chart-controls">
-                <div class="chart-legend">
-                  <div class="chart-legend-item"><div class="legend-line" style="border-color:var(--chart1)"></div>Total</div>
-                  <div class="chart-legend-item"><div class="legend-line dashed" style="border-color:var(--chart2)"></div>Unique</div>
-                </div>
-                <button class="chart-reset" onclick="App.resetZoom('clones-${idx}')">Reset zoom</button>
-              </div>`}
+              ${renderChartControls(`clones-${idx}`)}`}
             </div>
           </div>
           <!-- Referrers / Releases -->
@@ -409,6 +397,43 @@ const App = (() => {
     }
   }
 
+  /**
+   * Icon-only chart buttons, in display order. Each label doubles as the
+   * screen reader text and the tooltip.
+   * @type {Array<{ label: string, action: string, icon: string }>}
+   */
+  const CHART_BUTTONS = [
+    { label: "Pan left", action: "App.panChart('{id}', -1)", icon: '<path d="m15 18-6-6 6-6"/>' },
+    { label: "Pan right", action: "App.panChart('{id}', 1)", icon: '<path d="m9 18 6-6-6-6"/>' },
+    { label: "Zoom in", action: "App.zoomChart('{id}', 1)", icon: '<path d="M5 12h14M12 5v14"/>' },
+    { label: "Zoom out", action: "App.zoomChart('{id}', -1)", icon: '<path d="M5 12h14"/>' },
+    { label: "Reset zoom", action: "App.resetZoom('{id}')", icon: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>' },
+  ];
+
+  /**
+   * Renders the legend and the pan/zoom buttons below a chart.
+   * @param {string} canvasId Id of the chart canvas the buttons control.
+   * @returns {string} Controls markup.
+   */
+  function renderChartControls(canvasId) {
+    let buttons = "";
+    for (const b of CHART_BUTTONS) {
+      buttons += `<button type="button" class="chart-btn" title="${b.label}" onclick="${b.action.replace("{id}", canvasId)}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${b.icon}</svg>
+                    <span class="visually-hidden">${b.label}</span>
+                  </button>`;
+    }
+    return `<div class="chart-controls">
+                <div class="chart-legend">
+                  <div class="chart-legend-item"><div class="legend-line" style="border-color:var(--chart1)"></div>Total</div>
+                  <div class="chart-legend-item"><div class="legend-line dashed" style="border-color:var(--chart2)"></div>Unique</div>
+                </div>
+                <div class="chart-buttons">
+                  ${buttons}
+                </div>
+              </div>`;
+  }
+
   function renderReferrersTable(referrers) {
     if (referrers.length === 0) {
       return '<div class="no-data-msg">No referrer data yet</div>';
@@ -427,8 +452,11 @@ const App = (() => {
     if (!canvas) return;
 
     const labels = dataPoints.map((d) => dateLabel(d.date));
-    const totals = dataPoints.map((d) => d.count);
-    const uniques = dataPoints.map((d) => d.uniques);
+    // Plot against the day index on a linear scale so panning is stepless
+    const totals = dataPoints.map((d, i) => ({ x: i, y: d.count }));
+    const uniques = dataPoints.map((d, i) => ({ x: i, y: d.uniques }));
+    const maxIdx = Math.max(labels.length - 1, 0);
+    const maxCount = dataPoints.reduce((m, d) => Math.max(m, d.count, d.uniques), 0);
 
     // Compute initial viewport using days-based range
     const defaultRange = theme.defaultChartRange;
@@ -451,6 +479,10 @@ const App = (() => {
         enabled: true,
         mode: "x",
       };
+      // Keep the view inside the data and show at least three days
+      zoomOptions.limits = {
+        x: { min: 0, max: maxIdx, minRange: 2 },
+      };
     }
 
     // Read font families from theme CSS vars for tooltip consistency
@@ -460,7 +492,6 @@ const App = (() => {
     const chart = new Chart(canvas.getContext("2d"), {
       type: "line",
       data: {
-        labels,
         datasets: [
           {
             label: "Total",
@@ -471,7 +502,8 @@ const App = (() => {
             pointHoverRadius: 6,
             pointBackgroundColor: getCSS("--chart1"),
             pointHoverBackgroundColor: getCSS("--chart1"),
-            tension: 0.3,
+            // Monotone curves never overshoot, so flat zero stretches stay flat
+            cubicInterpolationMode: "monotone",
             fill: false,
           },
           {
@@ -484,7 +516,7 @@ const App = (() => {
             pointHoverRadius: 6,
             pointBackgroundColor: getCSS("--chart2"),
             pointHoverBackgroundColor: getCSS("--chart2"),
-            tension: 0.3,
+            cubicInterpolationMode: "monotone",
             fill: false,
           },
         ],
@@ -493,6 +525,8 @@ const App = (() => {
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
+        // Transitions lag behind panning and zooming, so redraw instantly
+        animation: false,
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -506,7 +540,7 @@ const App = (() => {
             boxHeight: 2,
             boxPadding: 4,
             callbacks: {
-              title: (items) => items[0].label,
+              title: (items) => labels[items[0].parsed.x],
               label: (item) => ` ${item.dataset.label}: ${item.formattedValue}`,
             },
           },
@@ -514,15 +548,21 @@ const App = (() => {
         },
         scales: {
           x: {
+            type: "linear",
+            bounds: "data",
             ticks: {
               color: getCSS("--tx3"),
               font: { family: tooltipMonoFont, size: 9 },
               maxRotation: 0,
               maxTicksLimit: 6,
+              precision: 0,
+              includeBounds: false,
+              callback: (value) => labels[value] || "",
             },
             grid: { color: getCSS("--border"), lineWidth: 0.5 },
             border: { display: false },
-            min: minIdx > 0 ? labels[minIdx] : undefined,
+            min: minIdx,
+            max: maxIdx,
           },
           y: {
             ticks: {
@@ -533,12 +573,14 @@ const App = (() => {
             grid: { color: getCSS("--border"), lineWidth: 0.5 },
             border: { display: false },
             beginAtZero: true,
+            // Fit all data, not just the visible days, so zoom stays horizontal
+            suggestedMax: maxCount,
           },
         },
       },
     });
 
-    chartInstances.push({ id: canvasId, chart, defaultMinIdx: minIdx, labels });
+    chartInstances.push({ id: canvasId, chart, defaultMinIdx: minIdx });
   }
 
   function updateAllChartColors() {
@@ -557,15 +599,64 @@ const App = (() => {
     }
   }
 
+  /**
+   * Share of the visible chart width moved by one pan button press.
+   * @type {number}
+   */
+  const PAN_STEP = 0.25;
+
+  /**
+   * Zoom factor applied by one zoom button press.
+   * @type {number}
+   */
+  const ZOOM_STEP = 1.25;
+
+  /**
+   * Looks up a chart created by createChart.
+   * @param {string} canvasId Id of the chart canvas.
+   * @returns {Object|undefined} The chart entry, or undefined when absent.
+   */
+  function findChart(canvasId) {
+    return chartInstances.find((c) => c.id === canvasId);
+  }
+
+  /**
+   * Pans a chart horizontally by PAN_STEP of its visible width.
+   * @param {string} canvasId Id of the chart canvas.
+   * @param {number} direction -1 for earlier dates, 1 for later dates.
+   * @returns {void}
+   */
+  function panChart(canvasId, direction) {
+    const entry = findChart(canvasId);
+    if (!entry || !entry.chart.pan) return;
+    const { chart } = entry;
+    const width = chart.chartArea.right - chart.chartArea.left;
+    // A positive pixel delta drags the content right, revealing earlier dates
+    chart.pan({ x: -direction * width * PAN_STEP }, undefined, "none");
+  }
+
+  /**
+   * Zooms a chart horizontally around its centre by ZOOM_STEP.
+   * @param {string} canvasId Id of the chart canvas.
+   * @param {number} direction 1 to zoom in, -1 to zoom out.
+   * @returns {void}
+   */
+  function zoomChart(canvasId, direction) {
+    const entry = findChart(canvasId);
+    if (!entry || !entry.chart.zoom) return;
+    const factor = direction > 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+    entry.chart.zoom({ x: factor }, "none");
+  }
+
   function resetZoom(canvasId) {
-    const entry = chartInstances.find((c) => c.id === canvasId);
+    const entry = findChart(canvasId);
     if (!entry) return;
-    const { chart, defaultMinIdx, labels } = entry;
+    const { chart, defaultMinIdx } = entry;
     if (chart.resetZoom) {
-      chart.resetZoom();
+      chart.resetZoom("none");
     }
-    chart.options.scales.x.min = defaultMinIdx > 0 ? labels[defaultMinIdx] : undefined;
-    chart.update();
+    chart.options.scales.x.min = defaultMinIdx;
+    chart.update("none");
   }
 
   // ── Tabs ─────────────────────────────────────────────────────────────────
@@ -688,6 +779,8 @@ const App = (() => {
     init,
     toggleTheme,
     switchTab,
+    panChart,
+    zoomChart,
     resetZoom,
     exportCSV,
     handleDecrypt,
