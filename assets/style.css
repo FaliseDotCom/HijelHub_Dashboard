@@ -158,14 +158,16 @@ body {
   --bs-dropdown-font-size: 11px;
   --bs-dropdown-bg: var(--bg);
   --bs-dropdown-border-color: var(--border);
-  --bs-dropdown-link-color: var(--tx2);
+  --bs-dropdown-link-color: var(--tx);
   --bs-dropdown-link-hover-color: var(--tx);
   --bs-dropdown-link-hover-bg: var(--bg3);
   --bs-dropdown-link-active-color: var(--accent);
   --bs-dropdown-link-active-bg: var(--accent-soft);
-  --bs-dropdown-link-disabled-color: var(--tx3);
+  --bs-dropdown-link-disabled-color: var(--tx);
   font-family: var(--font-m);
 }
+
+.sort-menu .disabled { opacity: 0.45; }
 
 /* ── Repo sections ──────────────────────────────────────────────────────── */
 
