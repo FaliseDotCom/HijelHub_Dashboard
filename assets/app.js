@@ -711,10 +711,10 @@ const App = (() => {
    * @returns {string} Option markup.
    */
   function renderSortFace(option, showDir) {
-    if (option.key === DEFAULT_SORT_KEY) return `${option.label}<span class="d-inline-flex">${icon("sort")}</span>`;
+    if (option.key === DEFAULT_SORT_KEY) return `${option.label}<span class="d-inline-flex ms-auto">${icon("sort")}</span>`;
     if (!showDir) return `${icon(option.key)}${option.label}`;
     const dirName = sortDirName();
-    return `${icon(option.key)}${option.label}<span class="d-inline-flex">${icon(dirName)}<span class="visually-hidden">, ${dirName}</span></span>`;
+    return `${icon(option.key)}${option.label}<span class="d-inline-flex ms-auto">${icon(dirName)}<span class="visually-hidden">, ${dirName}</span></span>`;
   }
 
   /**
