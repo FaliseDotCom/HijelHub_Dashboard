@@ -25,17 +25,17 @@ const App = (() => {
   let repoEntries = [];
 
   /**
+   * Key of the sort option that keeps config order. It is the "Sort by"
+   * placeholder: no sort is chosen, so it has no direction to reverse.
+   * @type {string}
+   */
+  const DEFAULT_SORT_KEY = "order";
+
+  /**
    * Active sort option key and direction (1 ascending, -1 descending).
    * @type {{ key: string, dir: number }}
    */
-  let sortState = { key: "order", dir: 1 };
-
-  /**
-   * Whether the sort menu is open. Kept here because the
-   * sort bar is re-rendered on every sort change while the menu stays open.
-   * @type {boolean}
-   */
-  let sortMenuOpen = false;
+  let sortState = { key: DEFAULT_SORT_KEY, dir: 1 };
 
   /**
    * localStorage key that remembers the chosen sort between visits.
@@ -91,7 +91,6 @@ const App = (() => {
    * @type {Object<string, string>}
    */
   const ICONS = {
-    order: '<path d="M3 4h10M3 8h10M3 12h10"/>',
     name: '<path d="M2 13 5 3l3 10M3.2 9.5h3.6M10 6h4l-4 7h4"/>',
     visitors: '<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/>',
     clones: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>',
@@ -106,7 +105,6 @@ const App = (() => {
     sort: '<path d="M5 2.5v11M2.5 11 5 13.5 7.5 11M11 13.5v-11M8.5 5 11 2.5 13.5 5"/>',
     ascending: '<path d="M8 13V3M4 7l4-4 4 4"/>',
     descending: '<path d="M8 3v10M4 9l4 4 4-4"/>',
-    chevron: '<path d="m4 6 4 4 4-4"/>',
   };
 
   /**
@@ -361,7 +359,7 @@ const App = (() => {
     });
     // A remembered sort whose data is not collected yet falls back to config order
     if (!isSortAvailable(findSortOption(sortState.key))) {
-      sortState = { key: "order", dir: 1 };
+      sortState = { key: DEFAULT_SORT_KEY, dir: 1 };
     }
     if (repoEntries.length > 1) {
       html += renderSortBar();
@@ -622,7 +620,7 @@ const App = (() => {
    * @type {Array<{ key: string, label: string, title: string, dir: number, tab?: string, value: function(Object): Array }>}
    */
   const SORT_OPTIONS = [
-    { key: "order", label: "Default", title: "Order of config.json", dir: 1, value: (e) => [e.idx] },
+    { key: DEFAULT_SORT_KEY, label: "Sort by", title: "Order of config.json", dir: 1, value: (e) => [e.idx] },
     { key: "name", label: "Name", title: "Repository name", dir: 1, value: (e) => [e.repo.toLowerCase(), e.owner.toLowerCase()] },
     { key: "visitors", label: "Visitors", title: "All-time visitors, then unique visitors", dir: -1, value: (e) => trafficTotals(trafficList(e.data, "views")) },
     { key: "clones", label: "Clones", title: "All-time clones, then unique clones", dir: -1, value: (e) => trafficTotals(trafficList(e.data, "clones")) },
@@ -690,7 +688,7 @@ const App = (() => {
     try {
       const saved = JSON.parse(localStorage.getItem(SORT_STORAGE_KEY) || "null");
       if (saved && findSortOption(saved.key) && (saved.dir === 1 || saved.dir === -1)) {
-        sortState = { key: saved.key, dir: saved.dir };
+        sortState = { key: saved.key, dir: saved.key === DEFAULT_SORT_KEY ? 1 : saved.dir };
       }
     } catch {
       // Unreadable or blocked storage keeps the default order
@@ -698,93 +696,103 @@ const App = (() => {
   }
 
   /**
-   * Renders the sort bar shown above the repo list: a button with the active
-   * sort that opens the option buttons as a menu. The button holds every
-   * option's label stacked on top of each other, only the active one visible,
-   * so it is as wide as the open menu whichever option is active.
-   * @returns {string} Sort bar markup.
+   * Names the active sort direction.
+   * @returns {string} "ascending" or "descending".
    */
-  function renderSortBar() {
-    const dirName = sortState.dir < 0 ? "descending" : "ascending";
-    const dirIcon = `<span class="sort-dir">${icon(dirName)}<span class="visually-hidden">, ${dirName}</span></span>`;
-    let buttons = "";
-    let faces = "";
-    for (const o of SORT_OPTIONS) {
+  function sortDirName() {
+    return sortState.dir < 0 ? "descending" : "ascending";
+  }
+
+  /**
+   * Renders what a sort option shows: its icon, label and direction arrow. The
+   * "Sort by" placeholder has no sort to show, so double arrows follow its label.
+   * @param {Object} option Sort option.
+   * @param {boolean} showDir Whether to add the direction arrow.
+   * @returns {string} Option markup.
+   */
+  function renderSortFace(option, showDir) {
+    if (option.key === DEFAULT_SORT_KEY) return `${option.label}<span class="d-inline-flex">${icon("sort")}</span>`;
+    if (!showDir) return `${icon(option.key)}${option.label}`;
+    const dirName = sortDirName();
+    return `${icon(option.key)}${option.label}<span class="d-inline-flex">${icon(dirName)}<span class="visually-hidden">, ${dirName}</span></span>`;
+  }
+
+  /**
+   * Renders the content of the dropdown button: every option's label stacked
+   * on top of each other, only the active one visible, so the button keeps the
+   * width of the widest label whichever option is active.
+   * @returns {string} Button content markup.
+   */
+  function renderSortFaces() {
+    return SORT_OPTIONS.map((o) => {
+      const hidden = o.key === sortState.key ? "" : " invisible";
+      return `<span class="d-inline-flex align-items-center gap-1${hidden}">${renderSortFace(o, true)}</span>`;
+    }).join("");
+  }
+
+  /**
+   * Renders the dropdown items. The tooltip is on the list item because a
+   * disabled dropdown item ignores the mouse.
+   * @returns {string} List items markup.
+   */
+  function renderSortItems() {
+    return SORT_OPTIONS.map((o) => {
       const active = o.key === sortState.key;
-      faces += `<span${active ? "" : ' class="sort-sizer"'}>${icon(o.key)}${o.label}${dirIcon}</span>`;
       const reason = sortUnavailableReason(o);
       const available = reason === "";
       let title = o.title;
       if (!available) title += ` · ${reason}`;
-      else if (active) title += " · click to reverse";
-      buttons += `<button type="button" class="sort-btn${active ? " active" : ""}" data-sort="${o.key}" title="${title}" aria-pressed="${active}"${available ? "" : ' aria-disabled="true"'} onclick="App.setSort('${o.key}')">
-                ${icon(o.key)}
-                <span>${o.label}</span>
-                ${active ? dirIcon : ""}
-              </button>`;
-    }
-    return `<div class="sort-bar" id="sort-bar">
-              <span class="sort-label" id="sort-label">${icon("sort")}Sort by</span>
-              <div class="sort-select${sortMenuOpen ? " open" : ""}" id="sort-select" onpointerleave="App.leaveSortMenu(event)">
-                <button type="button" class="sort-btn sort-toggle active" id="sort-toggle" title="Choose how to sort" aria-labelledby="sort-label sort-toggle" aria-expanded="${sortMenuOpen}" aria-controls="sort-options" onclick="App.toggleSortMenu()">
-                  <span class="sort-current">${faces}</span>
-                  <span class="sort-chevron">${icon("chevron")}</span>
+      else if (active && o.key !== DEFAULT_SORT_KEY) title += " · click to reverse";
+      return `<li title="${title}">
+                <button type="button" class="dropdown-item d-flex align-items-center gap-1${active ? " active" : ""}${available ? "" : " disabled"}" data-sort="${o.key}" aria-pressed="${active}"${available ? "" : ' aria-disabled="true"'} onclick="App.setSort('${o.key}')">
+                  ${renderSortFace(o, active)}
                 </button>
-                <div class="sort-options" id="sort-options" role="toolbar" aria-labelledby="sort-label">
-                  ${buttons}
-                </div>
+              </li>`;
+    }).join("");
+  }
+
+  /**
+   * Names the dropdown button for screen readers. Its visible text does not
+   * say "Sort by" once a sort is chosen.
+   * @returns {string} Accessible name.
+   */
+  function sortToggleName() {
+    const option = findSortOption(sortState.key);
+    return option.key === DEFAULT_SORT_KEY ? option.label : `Sort by ${option.label}, ${sortDirName()}`;
+  }
+
+  /**
+   * Renders the sort bar shown above the repo list, a Bootstrap dropdown that
+   * stays open on a click inside it, so an option can be chosen and reversed.
+   * @returns {string} Sort bar markup.
+   */
+  function renderSortBar() {
+    return `<div class="d-flex justify-content-end mb-4">
+              <div class="dropdown">
+                <button type="button" class="dropdown-toggle sort-toggle" id="sort-toggle" title="Choose how to sort" aria-label="${sortToggleName()}" aria-expanded="false" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                  <span class="d-grid sort-faces" id="sort-faces">${renderSortFaces()}</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow sort-menu" id="sort-menu">
+                  ${renderSortItems()}
+                </ul>
               </div>
             </div>`;
   }
 
   /**
-   * Opens or closes the sort menu.
-   * @param {boolean} open True to open the menu.
+   * Updates the sort bar for the active sort. Its contents are replaced rather
+   * than the whole bar, so the open dropdown stays open.
+   * @param {string} key Key of the option that was chosen.
    * @returns {void}
    */
-  function setSortMenu(open) {
-    sortMenuOpen = open;
-    const select = document.getElementById("sort-select");
-    if (!select) return;
-    select.classList.toggle("open", open);
-    document.getElementById("sort-toggle").setAttribute("aria-expanded", String(open));
-  }
-
-  /**
-   * Opens the sort menu, or closes it when it is open.
-   * @returns {void}
-   */
-  function toggleSortMenu() {
-    setSortMenu(!sortMenuOpen);
-  }
-
-  /**
-   * Closes the sort menu when the mouse moves out of it. Touch and pen
-   * pointers also "leave" after every tap, so for them the menu stays open
-   * until a tap outside it.
-   * @param {PointerEvent} event The pointerleave event.
-   * @returns {void}
-   */
-  function leaveSortMenu(event) {
-    if (event.pointerType === "mouse") setSortMenu(false);
-  }
-
-  /**
-   * Closes the sort menu when a click, tap or keyboard focus lands outside
-   * it, or when Escape is pressed.
-   * @param {Event} event A pointerdown, focusin or keydown event on the document.
-   * @returns {void}
-   */
-  function closeSortMenuOutside(event) {
-    const select = document.getElementById("sort-select");
-    if (!sortMenuOpen || !select) return;
-    if (event.type === "keydown") {
-      if (event.key !== "Escape") return;
-      if (select.contains(document.activeElement)) document.getElementById("sort-toggle").focus();
-    } else if (select.contains(event.target)) {
-      return;
-    }
-    setSortMenu(false);
+  function updateSortBar(key) {
+    const menu = document.getElementById("sort-menu");
+    if (!menu) return;
+    const hadFocus = menu.contains(document.activeElement);
+    menu.innerHTML = renderSortItems();
+    document.getElementById("sort-faces").innerHTML = renderSortFaces();
+    document.getElementById("sort-toggle").setAttribute("aria-label", sortToggleName());
+    if (hadFocus) menu.querySelector(`[data-sort="${key}"]`).focus();
   }
 
   /**
@@ -844,14 +852,15 @@ const App = (() => {
 
   /**
    * Sorts the repos by an option; choosing the active option again reverses
-   * the direction. The choice is remembered for the next visit.
+   * the direction, except for the "Sort by" placeholder, which always keeps
+   * config order. The choice is remembered for the next visit.
    * @param {string} key Sort option key.
    * @returns {void}
    */
   function setSort(key) {
     const option = findSortOption(key);
     if (!isSortAvailable(option)) return;
-    sortState = key === sortState.key
+    sortState = key === sortState.key && key !== DEFAULT_SORT_KEY
       ? { key, dir: -sortState.dir }
       : { key, dir: option.dir };
     try {
@@ -860,12 +869,7 @@ const App = (() => {
       // The sort still applies for this visit
     }
 
-    const bar = document.getElementById("sort-bar");
-    if (bar) {
-      const hadFocus = bar.contains(document.activeElement);
-      bar.outerHTML = renderSortBar();
-      if (hadFocus) document.querySelector(`#sort-bar [data-sort="${key}"]`).focus();
-    }
+    updateSortBar(key);
     applySort();
   }
 
@@ -1155,9 +1159,6 @@ const App = (() => {
   async function init() {
     await loadTheme();
     loadSortState();
-    for (const type of ["pointerdown", "focusin", "keydown"]) {
-      document.addEventListener(type, closeSortMenuOutside);
-    }
 
     const config = await loadConfig();
     if (config.repos.length === 0) {
@@ -1208,8 +1209,6 @@ const App = (() => {
     toggleTheme,
     switchTab,
     setSort,
-    toggleSortMenu,
-    leaveSortMenu,
     panChart,
     zoomChart,
     resetZoom,

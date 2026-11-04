@@ -149,56 +149,23 @@ body {
 
 /* ── Sort bar ───────────────────────────────────────────────────────────── */
 
-.sort-bar { display: flex; align-items: baseline; gap: 8px; margin-bottom: 24px; }
-
-.sort-label {
-  display: inline-flex; align-items: center; gap: 5px; flex: none;
-  font-size: 11px; font-family: var(--font-m); color: var(--tx3);
-}
-
-.sort-label svg { width: 14px; height: 14px; }
-
-.sort-select { position: relative; flex: none; }
-
 /* Every option's label in one grid cell, so the button fits the widest */
-.sort-current { display: grid; }
-.sort-current > span { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 5px; }
-.sort-current > .sort-sizer { visibility: hidden; }
+.sort-faces > span { grid-area: 1 / 1; }
 
-.sort-chevron { display: inline-flex; }
-.sort-select.open .sort-chevron { transform: rotate(180deg); }
-
-.sort-options {
-  display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 50;
-  flex-direction: column; gap: 5px; min-width: 100%;
-  padding: 6px; background: var(--bg); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+/* Bootstrap's dropdown in the dashboard's colours and type */
+.sort-menu {
+  --bs-dropdown-min-width: 100%;
+  --bs-dropdown-font-size: 11px;
+  --bs-dropdown-bg: var(--bg);
+  --bs-dropdown-border-color: var(--border);
+  --bs-dropdown-link-color: var(--tx2);
+  --bs-dropdown-link-hover-color: var(--tx);
+  --bs-dropdown-link-hover-bg: var(--bg3);
+  --bs-dropdown-link-active-color: var(--accent);
+  --bs-dropdown-link-active-bg: var(--accent-soft);
+  --bs-dropdown-link-disabled-color: var(--tx3);
+  font-family: var(--font-m);
 }
-
-.sort-select.open .sort-options { display: flex; }
-
-/* Covers the gap above the menu, so moving the mouse into it does not close it */
-.sort-options::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 6px; }
-
-.sort-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 11px; font-family: var(--font-m);
-  color: var(--tx3); background: var(--bg2);
-  border: 1px solid var(--border); border-radius: 20px;
-  padding: 4px 9px 4px 7px; cursor: pointer; transition: all 0.15s;
-}
-
-.sort-btn:hover:not(.active):not([aria-disabled="true"]) { background: var(--bg3); color: var(--tx2); }
-.sort-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.sort-btn svg { width: 12px; height: 12px; }
-.sort-btn[aria-disabled="true"] { opacity: 0.45; cursor: default; }
-
-.sort-btn.active {
-  background: var(--accent-soft); color: var(--accent);
-  border-color: var(--accent); font-weight: 500;
-}
-
-.sort-dir { display: inline-flex; margin-left: -1px; }
 
 /* ── Repo sections ──────────────────────────────────────────────────────── */
 
@@ -252,16 +219,17 @@ body {
 
 .badge-accent { color: var(--accent); font-weight: 500; }
 
-.csv-btn {
-  margin-left: auto; display: flex; align-items: center; gap: 5px;
+.csv-btn, .sort-toggle {
+  display: flex; align-items: center; gap: 5px;
   font-size: 11px; font-family: var(--font-m);
   color: var(--tx3); background: var(--bg2);
   border: 1px solid var(--border); border-radius: 6px;
   padding: 5px 11px; cursor: pointer; transition: all 0.15s;
 }
 
-.csv-btn:hover { background: var(--bg3); color: var(--tx2); }
-.csv-btn svg { width: 12px; height: 12px; }
+.csv-btn { margin-left: auto; }
+.csv-btn:hover, .sort-toggle:hover { background: var(--bg3); color: var(--tx2); }
+.csv-btn svg, .sort-toggle svg, .sort-menu svg { width: 12px; height: 12px; }
 
 /* ── Cards ──────────────────────────────────────────────────────────────── */
 
