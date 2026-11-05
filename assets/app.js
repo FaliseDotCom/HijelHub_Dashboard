@@ -180,7 +180,7 @@ const App = (() => {
 
   async function loadTheme() {
     try {
-      const res = await fetch("theme.json");
+      const res = await fetch("theme.json", { cache: "no-cache" });
       theme = await res.json();
     } catch {
       theme = {};
@@ -265,7 +265,7 @@ const App = (() => {
 
   async function loadConfig() {
     try {
-      const res = await fetch("config.json");
+      const res = await fetch("config.json", { cache: "no-cache" });
       return await res.json();
     } catch {
       return { repos: [] };
@@ -276,7 +276,7 @@ const App = (() => {
     const [owner, repo] = repoFullName.split("/");
     const filename = `${owner}--${repo}.json`;
     try {
-      const res = await fetch(`data/${filename}`);
+      const res = await fetch(`data/${filename}`, { cache: "no-cache" });
       if (!res.ok) return null;
       return await res.json();
     } catch {
