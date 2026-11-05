@@ -147,6 +147,68 @@ body {
 .skeleton-header { height: 30px; width: 240px; margin-bottom: 14px; }
 .skeleton-card { height: 260px; border-radius: var(--radius-lg); }
 
+/* ── Sort bar ───────────────────────────────────────────────────────────── */
+
+/* Right-aligned: [dropdown] [ascending] [descending]. Same corner radius as
+   the CSV and chart buttons; the pill shape is kept for badges only. */
+.sort-bar { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-bottom: 24px; }
+
+.sort-select { position: relative; flex: none; margin-right: 2px; }
+
+.sort-toggle, .sort-dir-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; font-size: 11px; font-family: var(--font-m);
+  color: var(--tx2); background: var(--bg2);
+  border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer; transition: all 0.15s;
+}
+
+.sort-toggle { padding: 0 9px 0 10px; }
+.sort-dir-btn { justify-content: center; width: 28px; padding: 0; color: var(--tx3); }
+
+.sort-toggle:hover, .sort-dir-btn:hover:not(.active):not([aria-disabled="true"]) { background: var(--bg3); color: var(--tx2); }
+.sort-toggle:focus-visible, .sort-dir-btn:focus-visible, .sort-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sort-toggle svg, .sort-dir-btn svg, .sort-item svg { width: 12px; height: 12px; flex: none; }
+.sort-dir-btn svg { width: 13px; height: 13px; }
+
+.sort-dir-btn.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.sort-dir-btn[aria-disabled="true"] { opacity: 0.45; cursor: default; }
+
+/* Every face in one grid cell, so the toggle fits the widest */
+.sort-current { display: grid; text-align: left; }
+.sort-current > span { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 6px; }
+.sort-current > .sort-sizer { visibility: hidden; }
+
+.sort-chevron { display: inline-flex; color: var(--tx3); transition: transform 0.15s; }
+.sort-select.open .sort-chevron { transform: rotate(180deg); }
+
+/* Plain dropdown list, opening under the toggle and aligned to its right edge */
+.sort-options {
+  display: none; position: absolute; top: calc(100% + 4px); right: 0; z-index: 50;
+  flex-direction: column; min-width: 100%; padding: 4px 0;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.sort-select.open .sort-options { display: flex; }
+
+/* Covers the gap above the menu, so moving the mouse into it does not close it */
+.sort-options::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 6px; }
+
+.sort-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 6px 14px 6px 12px; white-space: nowrap; text-align: left;
+  font-size: 12px; font-family: var(--font-m);
+  color: var(--tx2); background: none; border: none; border-radius: 0;
+  cursor: pointer;
+}
+
+.sort-item svg { color: var(--tx3); }
+.sort-item:hover:not([aria-disabled="true"]) { background: var(--bg2); color: var(--tx); }
+.sort-item.active { color: var(--accent); background: var(--accent-soft); font-weight: 500; }
+.sort-item.active svg { color: var(--accent); }
+.sort-item[aria-disabled="true"] { opacity: 0.45; cursor: default; }
+
 /* ── Repo sections ──────────────────────────────────────────────────────── */
 
 .repo-section { margin-bottom: 36px; }
@@ -190,6 +252,10 @@ body {
 
 .repo-badge:hover { background: var(--bg3); color: var(--tx2); text-decoration: none; }
 .repo-badge svg { width: 12px; height: 12px; opacity: 0.6; }
+
+/* Badge or card holding the values the repos are sorted on */
+.repo-badge.sorted, .card-dash.sorted { border-color: var(--accent); }
+.repo-badge.sorted { color: var(--accent); }
 
 .badge-sep { opacity: 0.35; margin: 0 1px; }
 

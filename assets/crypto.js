@@ -67,6 +67,7 @@ const DashCrypto = (() => {
       format: "plaintext",
       repo: fileObj.repo,
       updated: fileObj.updated,
+      stars: fileObj.stars,
       forks: fileObj.forks,
       issues: fileObj.issues,
       pullRequests: fileObj.pullRequests,
