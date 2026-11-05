@@ -113,6 +113,7 @@ function processFile(filepath) {
     format: "encrypted",
     repo: raw.repo,
     updated: raw.updated,
+    stars: raw.stars,
     forks: raw.forks,
     issues: raw.issues,
     pullRequests: raw.pullRequests,

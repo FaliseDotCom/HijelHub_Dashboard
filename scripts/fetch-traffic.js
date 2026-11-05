@@ -31,6 +31,34 @@ const DATA_DIR = path.join(__dirname, "..", "data");
 // ── HTTP helper ──────────────────────────────────────────────────────────────
 
 function apiGet(endpoint) {
+  return apiRequest(endpoint).then((res) => res.body);
+}
+
+/**
+ * Fetches every page of a paginated list endpoint, 100 items per page,
+ * following the "next" link until the last page.
+ * @param {string} endpoint API path of a list endpoint, without paging parameters.
+ * @returns {Promise<Array>} All items of the list.
+ */
+async function apiGetAll(endpoint) {
+  const items = [];
+  let next = `${endpoint}?per_page=100`;
+  while (next) {
+    const { headers, body } = await apiRequest(next);
+    if (!Array.isArray(body)) break;
+    items.push(...body);
+    const link = /<https:\/\/api\.github\.com([^>]+)>; rel="next"/.exec(headers.link || "");
+    next = link ? link[1] : null;
+  }
+  return items;
+}
+
+/**
+ * Sends an authenticated GET request to the GitHub REST API.
+ * @param {string} endpoint API path, including any query string.
+ * @returns {Promise<{ headers: Object, body: * }>} Response headers and parsed JSON body.
+ */
+function apiRequest(endpoint) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: "api.github.com",
@@ -50,7 +78,7 @@ function apiGet(endpoint) {
       res.on("end", () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           try {
-            resolve(JSON.parse(body));
+            resolve({ headers: res.headers, body: JSON.parse(body) });
           } catch {
             reject(new Error(`Invalid JSON from ${endpoint}: ${body}`));
           }
@@ -171,7 +199,7 @@ async function processRepo(repoFullName) {
       apiGet(`/repos/${owner}/${repo}/traffic/views`),
       apiGet(`/repos/${owner}/${repo}/traffic/clones`),
       apiGet(`/repos/${owner}/${repo}/traffic/popular/referrers`),
-      apiGet(`/repos/${owner}/${repo}/releases`),
+      apiGetAll(`/repos/${owner}/${repo}/releases`),
     ]);
   } catch (err) {
     console.error(`  ✗  API error for ${repoFullName}: ${err.message}`);
@@ -201,7 +229,8 @@ async function processRepo(repoFullName) {
   console.log(`  Releases: ${Array.isArray(releases) ? releases.length : 0} found`);
   console.log(`  Issues: ${closedIssues} closed, ${openIssues} open`);
   console.log(`  PRs: ${mergedPRs} merged, ${openPRs} open`);
-  console.log(`  Forks: ${repoMeta.forks_count}`);
+  console.log(`  Stars: ${repoMeta.stargazers_count}, forks: ${repoMeta.forks_count}`);
+  console.log(`  Last push: ${repoMeta.pushed_at}`);
 
   // Build releases summary (tag + total download count across all assets)
   const releaseSummary = Array.isArray(releases)
@@ -216,10 +245,12 @@ async function processRepo(repoFullName) {
     format: "plaintext",
     repo: repoFullName,
     updated: new Date().toISOString(),
+    stars: repoMeta.stargazers_count || 0,
     forks: repoMeta.forks_count || 0,
     issues: { closed: closedIssues, open: openIssues },
     pullRequests: { merged: mergedPRs, open: openPRs },
     data: {
+      pushedAt: repoMeta.pushed_at || "",
       views: mergeDailyData(existing.data.views || [], views.views || []),
       clones: mergeDailyData(existing.data.clones || [], clones.clones || []),
       referrers: mergeReferrers(existing.data.referrers || [], referrers || []),
