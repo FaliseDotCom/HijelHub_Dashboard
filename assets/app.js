@@ -25,17 +25,10 @@ const App = (() => {
   let repoEntries = [];
 
   /**
-   * Key of the sort option that keeps config order. It is the "Sort by"
-   * placeholder: no sort is chosen, so it has no direction to reverse.
-   * @type {string}
-   */
-  const DEFAULT_SORT_KEY = "order";
-
-  /**
    * Active sort option key and direction (1 ascending, -1 descending).
    * @type {{ key: string, dir: number }}
    */
-  let sortState = { key: DEFAULT_SORT_KEY, dir: 1 };
+  let sortState = { key: "order", dir: 1 };
 
   /**
    * localStorage key that remembers the chosen sort between visits.
@@ -91,6 +84,7 @@ const App = (() => {
    * @type {Object<string, string>}
    */
   const ICONS = {
+    order: '<path d="M3 4h10M3 8h10M3 12h10"/>',
     name: '<path d="M2 13 5 3l3 10M3.2 9.5h3.6M10 6h4l-4 7h4"/>',
     visitors: '<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/>',
     clones: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>',
@@ -105,6 +99,7 @@ const App = (() => {
     sort: '<path d="M5 2.5v11M2.5 11 5 13.5 7.5 11M11 13.5v-11M8.5 5 11 2.5 13.5 5"/>',
     ascending: '<path d="M8 13V3M4 7l4-4 4 4"/>',
     descending: '<path d="M8 3v10M4 9l4 4 4-4"/>',
+    chevron: '<path d="m4 6 4 4 4-4"/>',
   };
 
   /**
@@ -178,7 +173,7 @@ const App = (() => {
 
   async function loadTheme() {
     try {
-      const res = await fetch("theme.json");
+      const res = await fetch("theme.json", { cache: "no-cache" });
       theme = await res.json();
     } catch {
       theme = {};
@@ -263,7 +258,7 @@ const App = (() => {
 
   async function loadConfig() {
     try {
-      const res = await fetch("config.json");
+      const res = await fetch("config.json", { cache: "no-cache" });
       return await res.json();
     } catch {
       return { repos: [] };
@@ -274,7 +269,7 @@ const App = (() => {
     const [owner, repo] = repoFullName.split("/");
     const filename = `${owner}--${repo}.json`;
     try {
-      const res = await fetch(`data/${filename}`);
+      const res = await fetch(`data/${filename}`, { cache: "no-cache" });
       if (!res.ok) return null;
       return await res.json();
     } catch {
@@ -359,8 +354,9 @@ const App = (() => {
     });
     // A remembered sort whose data is not collected yet falls back to config order
     if (!isSortAvailable(findSortOption(sortState.key))) {
-      sortState = { key: DEFAULT_SORT_KEY, dir: 1 };
+      sortState = { key: "order", dir: 1 };
     }
+    if (sortState.key === "order") sortState.dir = 1;
     if (repoEntries.length > 1) {
       html += renderSortBar();
     }
@@ -620,7 +616,7 @@ const App = (() => {
    * @type {Array<{ key: string, label: string, title: string, dir: number, tab?: string, value: function(Object): Array }>}
    */
   const SORT_OPTIONS = [
-    { key: DEFAULT_SORT_KEY, label: "Sort by", title: "Order of config.json", dir: 1, value: (e) => [e.idx] },
+    { key: "order", label: "Sort by", title: "Order of config.json", dir: 1, value: (e) => [e.idx] },
     { key: "name", label: "Name", title: "Repository name", dir: 1, value: (e) => [e.repo.toLowerCase(), e.owner.toLowerCase()] },
     { key: "visitors", label: "Visitors", title: "All-time visitors, then unique visitors", dir: -1, value: (e) => trafficTotals(trafficList(e.data, "views")) },
     { key: "clones", label: "Clones", title: "All-time clones, then unique clones", dir: -1, value: (e) => trafficTotals(trafficList(e.data, "clones")) },
@@ -688,7 +684,7 @@ const App = (() => {
     try {
       const saved = JSON.parse(localStorage.getItem(SORT_STORAGE_KEY) || "null");
       if (saved && findSortOption(saved.key) && (saved.dir === 1 || saved.dir === -1)) {
-        sortState = { key: saved.key, dir: saved.key === DEFAULT_SORT_KEY ? 1 : saved.dir };
+        sortState = { key: saved.key, dir: saved.dir };
       }
     } catch {
       // Unreadable or blocked storage keeps the default order
@@ -711,7 +707,7 @@ const App = (() => {
    * @returns {string} Option markup.
    */
   function renderSortFace(option, showDir) {
-    if (option.key === DEFAULT_SORT_KEY) return `${option.label}<span class="d-inline-flex ms-auto">${icon("sort")}</span>`;
+    if (option.key === "order") return `${option.label}<span class="d-inline-flex ms-auto">${icon("sort")}</span>`;
     if (!showDir) return `${icon(option.key)}${option.label}`;
     const dirName = sortDirName();
     return `${icon(option.key)}${option.label}<span class="d-inline-flex ms-auto">${icon(dirName)}<span class="visually-hidden">, ${dirName}</span></span>`;
@@ -742,7 +738,7 @@ const App = (() => {
       const available = reason === "";
       let title = o.title;
       if (!available) title += ` · ${reason}`;
-      else if (active && o.key !== DEFAULT_SORT_KEY) title += " · click to reverse";
+      else if (active && o.key !== "order") title += " · click to reverse";
       return `<li title="${title}">
                 <button type="button" class="dropdown-item d-flex align-items-center gap-1${active ? " active" : ""}${available ? "" : " disabled"}" data-sort="${o.key}" aria-pressed="${active}"${available ? "" : ' aria-disabled="true"'} onclick="App.setSort('${o.key}')">
                   ${renderSortFace(o, active)}
@@ -758,7 +754,7 @@ const App = (() => {
    */
   function sortToggleName() {
     const option = findSortOption(sortState.key);
-    return option.key === DEFAULT_SORT_KEY ? option.label : `Sort by ${option.label}, ${sortDirName()}`;
+    return option.key === "order" ? option.label : `Sort by ${option.label}, ${sortDirName()}`;
   }
 
   /**
@@ -860,7 +856,7 @@ const App = (() => {
   function setSort(key) {
     const option = findSortOption(key);
     if (!isSortAvailable(option)) return;
-    sortState = key === sortState.key && key !== DEFAULT_SORT_KEY
+    sortState = key === sortState.key && key !== "order"
       ? { key, dir: -sortState.dir }
       : { key, dir: option.dir };
     try {

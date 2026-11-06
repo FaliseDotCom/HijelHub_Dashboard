@@ -149,6 +149,18 @@ body {
 
 /* ── Sort bar ───────────────────────────────────────────────────────────── */
 
+/* Same look as .csv-btn, kept here so the fork's sort styles stay in this section */
+.sort-toggle {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; font-family: var(--font-m);
+  color: var(--tx3); background: var(--bg2);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 11px; cursor: pointer; transition: all 0.15s;
+}
+
+.sort-toggle:hover { background: var(--bg3); color: var(--tx2); }
+.sort-toggle svg, .sort-menu svg { width: 12px; height: 12px; }
+
 /* Every option's label in one grid cell, so the button fits the widest */
 .sort-faces > span { grid-area: 1 / 1; }
 
@@ -221,17 +233,16 @@ body {
 
 .badge-accent { color: var(--accent); font-weight: 500; }
 
-.csv-btn, .sort-toggle {
-  display: flex; align-items: center; gap: 5px;
+.csv-btn {
+  margin-left: auto; display: flex; align-items: center; gap: 5px;
   font-size: 11px; font-family: var(--font-m);
   color: var(--tx3); background: var(--bg2);
   border: 1px solid var(--border); border-radius: 6px;
   padding: 5px 11px; cursor: pointer; transition: all 0.15s;
 }
 
-.csv-btn { margin-left: auto; }
-.csv-btn:hover, .sort-toggle:hover { background: var(--bg3); color: var(--tx2); }
-.csv-btn svg, .sort-toggle svg, .sort-menu svg { width: 12px; height: 12px; }
+.csv-btn:hover { background: var(--bg3); color: var(--tx2); }
+.csv-btn svg { width: 12px; height: 12px; }
 
 /* ── Cards ──────────────────────────────────────────────────────────────── */
 
